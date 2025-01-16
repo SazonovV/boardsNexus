@@ -1,0 +1,31 @@
+Arguments: 
+  /Users/sazonov/.nvm/versions/node/v18.20.3/bin/node /usr/local/bin/yarn install
+
+PATH: 
+  /Users/sazonov/.nvm/versions/node/v18.20.3/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Library/Frameworks/Python.framework/Versions/2.7/bin:/Library/Frameworks/Python.framework/Versions/3.11/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Users/sazonov/.nvm/versions/node/v18.20.3/bin:/Users/sazonov/Library/Application Support/JetBrains/Toolbox/scripts:/Users/sazonov/apache-maven-3.9.4/bin:/Users/sazonov/apache-maven-3.9.4/bin
+
+Yarn version: 
+  1.22.19
+
+Node version: 
+  18.20.3
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  SyntaxError: /Users/sazonov/Desktop/boardCursorv3/package.json: Unexpected end of JSON input
+      at JSON.parse (<anonymous>)
+      at /usr/local/lib/node_modules/yarn/lib/cli.js:1629:59
+      at Generator.next (<anonymous>)
+      at step (/usr/local/lib/node_modules/yarn/lib/cli.js:310:30)
+      at /usr/local/lib/node_modules/yarn/lib/cli.js:321:13
+
+npm manifest: 
+  
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile
