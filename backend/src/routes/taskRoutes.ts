@@ -1,0 +1,54 @@
+import express, { Request, Response } from 'express';
+import { taskService } from '../services/taskService';
+import { Task, TaskStatus } from '../types';
+
+interface CreateTaskRequest extends Omit<Task, 'id' | 'createdAt' | 'updatedAt'> {}
+
+interface UpdateTaskStatusRequest {
+  status: TaskStatus;
+  position: number;
+}
+
+const router = express.Router();
+
+router.get('/board/:boardId', async (req: Request<{ boardId: string }>, res: Response) => {
+  try {
+    const tasks = await taskService.getBoardTasks(req.params.boardId);
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/', async (req: Request<{}, {}, CreateTaskRequest>, res: Response) => {
+  try {
+    const task = await taskService.createTask(req.body);
+    res.status(201).json(task);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/:id', async (req: Request<{ id: string }, {}, UpdateTaskStatusRequest>, res: Response) => {
+  try {
+    const task = await taskService.updateTaskStatus(
+      req.params.id,
+      req.body.status,
+      req.body.position
+    );
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
+  try {
+    await taskService.deleteTask(req.params.id);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+export const taskRoutes = router; 

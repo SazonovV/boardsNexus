@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { useParams } from 'react-router-dom';
 import { Board as BoardType, Task, TaskStatus, TaskStatusLabels } from '../types';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskForm from './TaskForm';
 import BoardUsers from './BoardUsers';
@@ -19,11 +19,11 @@ const Board: React.FC = () => {
   useEffect(() => {
     const loadBoard = async () => {
       if (!id) return;
-      const boardData = await api.getBoards();
+      const boardData = await apiService.getBoards();
       const currentBoard = boardData.find(b => b.id === id);
       if (currentBoard) {
         setBoard(currentBoard);
-        const boardTasks = await api.getBoardTasks(id);
+        const boardTasks = await apiService.getBoardTasks(id);
         setTasks(boardTasks);
       }
     };
@@ -43,36 +43,49 @@ const Board: React.FC = () => {
     }
 
     const newStatus = destination.droppableId as TaskStatus;
+    const taskToUpdate = tasks.find(t => t.id === draggableId);
     
-    try {
-      const updatedTask = await api.updateTask(draggableId, { status: newStatus });
+    if (!taskToUpdate) return;
+
+    setTasks(prev => {
+      const updatedTasks = prev.filter(task => task.id !== draggableId);
+      const newTask = { ...taskToUpdate, status: newStatus };
       
-      setTasks(prev => {
-        const updatedTasks = prev.filter(task => task.id !== draggableId);
-        const newIndex = destination.index;
-        
-        const task = prev.find(t => t.id === draggableId);
-        if (!task) return prev;
-        
-        const newTask = { ...task, status: newStatus };
-        updatedTasks.splice(newIndex, 0, newTask);
-        
-        return updatedTasks;
+      updatedTasks.splice(destination.index, 0, newTask);
+      
+      return updatedTasks;
+    });
+
+    try {
+      await apiService.updateTask(draggableId, { 
+        status: newStatus,
+        position: destination.index 
       });
     } catch (error) {
       console.error('Failed to update task status:', error);
+      
+      setTasks(prev => {
+        const revertedTasks = prev.filter(task => task.id !== draggableId);
+        const originalTask = { ...taskToUpdate, status: source.droppableId as TaskStatus };
+        
+        revertedTasks.splice(source.index, 0, originalTask);
+        
+        return revertedTasks;
+      });
+
+      alert('Failed to update task status. Please try again.');
     }
-  }, []);
+  }, [tasks]);
 
   const handleTaskUpdate = async () => {
     if (!id) return;
-    const boardTasks = await api.getBoardTasks(id);
+    const boardTasks = await apiService.getBoardTasks(id);
     setTasks(boardTasks);
   };
 
   const handleDeleteTask = async (taskId: string) => {
     if (window.confirm('Are you sure you want to delete this task?')) {
-      await api.deleteTask(taskId);
+      await apiService.deleteTask(taskId);
       setTasks(prev => prev.filter(task => task.id !== taskId));
     }
   };

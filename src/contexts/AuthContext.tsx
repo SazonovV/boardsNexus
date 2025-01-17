@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User } from '../types';
+import { apiService } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -26,17 +27,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = useCallback(async (email: string, password: string) => {
-    // Здесь будет реальный API запрос
-    const mockUser: User = {
-      id: '1',
-      email,
-      name: 'Test User',
-      isAdmin: email.includes('admin'),
-    };
-    setUser(mockUser);
+    const user = await apiService.login(email, password);
+    setUser(user);
   }, []);
 
   const logout = useCallback(() => {
+    apiService.logout();
     setUser(null);
   }, []);
 
