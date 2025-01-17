@@ -1,6 +1,6 @@
 import { User } from '../types';
 import db from '../db';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 export const userService = {
@@ -32,22 +32,33 @@ export const userService = {
   },
 
   async login(email: string, password: string): Promise<User | null> {
-    const result = await db.query(
-      `SELECT id, email, name, password_hash, is_admin as "isAdmin", 
-              telegram_login as "telegramLogin", created_at as "createdAt", 
-              updated_at as "updatedAt"
-       FROM users WHERE email = $1`,
-      [email]
-    );
+    try {
+      const result = await db.query(
+        `SELECT id, email, name, password_hash, is_admin as "isAdmin", 
+                telegram_login as "telegramLogin", created_at as "createdAt", 
+                updated_at as "updatedAt"
+         FROM users WHERE email = $1`,
+        [email]
+      );
 
-    const user = result.rows[0];
-    if (!user) return null;
+      const user = result.rows[0];
+      if (!user) {
+        console.log('User not found:', email);
+        return null;
+      }
 
-    const isValid = await bcrypt.compare(password, user.password_hash);
-    if (!isValid) return null;
+      const isValid = await bcrypt.compare(password, user.password_hash);
+      if (!isValid) {
+        console.log('Invalid password for user:', email);
+        return null;
+      }
 
-    delete user.password_hash;
-    return user;
+      delete user.password_hash;
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      return null;
+    }
   },
 
   async deleteUser(id: string): Promise<void> {

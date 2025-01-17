@@ -5,15 +5,19 @@ services:
     image: postgres:14-alpine
     environment:
       POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      LANG: en_US.utf8
+      LC_COLLATE: en_US.utf8
+      LC_CTYPE: en_US.utf8
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,10 +28,11 @@ services:
       dockerfile: Dockerfile
     environment:
       DB_HOST: postgres
-      DB_USER: ${DB_USER}
+      DB_USER: postgres
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: boards_nexus
+      DB_NAME: ${DB_NAME}
       JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
     ports:
       - "3001:3001"
     depends_on:

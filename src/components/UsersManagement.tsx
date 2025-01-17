@@ -44,7 +44,7 @@ const UsersManagement: React.FC = () => {
         password: generatePassword ? undefined : userData.password
       });
 
-      if ('password' in response) {
+      if (response.password) {
         setCreatedUserPassword(response.password);
       }
 

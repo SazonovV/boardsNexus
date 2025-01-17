@@ -35,12 +35,12 @@ docker-compose ps
 
 # Проверяем, что таблицы созданы
 echo "Checking database tables..."
-docker-compose exec postgres psql -U ${DB_USER} -d ${DB_NAME} -c "\dt"
+docker-compose exec postgres psql -U postgres -d boards_nexus -c "\dt"
 
 echo "Deployment completed!"
 echo "Frontend: http://localhost"
 echo "Backend: http://localhost:3001"
-echo "Database: localhost:5432"
+echo "Database: localhost:5433"
 echo ""
 echo "Default admin credentials:"
 echo "Email: admin@example.com"

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import { Board, Task, User } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -7,8 +7,8 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Интерцептор для добавления токена к запросам
-api.interceptors.request.use((config: { headers: { Authorization: string; }; }) => {
+// Исправленный интерцептор
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
