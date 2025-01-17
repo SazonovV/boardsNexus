@@ -38,8 +38,8 @@ router.post('/login', async (req: Request<{}, {}, LoginRequest>, res: Response) 
 
 router.post('/register', async (req: Request<{}, {}, RegisterRequest>, res: Response) => {
   try {
-    const user = await userService.createUser(req.body);
-    res.status(201).json(user);
+    const { user, password } = await userService.createUser(req.body);
+    res.status(201).json({ user, password });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

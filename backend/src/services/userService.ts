@@ -1,10 +1,12 @@
 import { User } from '../types';
 import db from '../db';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 export const userService = {
-  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password: string }): Promise<User> {
-    const passwordHash = await bcrypt.hash(userData.password, 10);
+  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }): Promise<{ user: User; password: string }> {
+    const password = userData.password || crypto.randomBytes(4).toString('hex');
+    const passwordHash = await bcrypt.hash(password, 10);
     
     const result = await db.query(
       `INSERT INTO users (email, name, password_hash, is_admin, telegram_login)
@@ -14,7 +16,10 @@ export const userService = {
       [userData.email, userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
     );
     
-    return result.rows[0];
+    return {
+      user: result.rows[0],
+      password: password
+    };
   },
 
   async getUsers(): Promise<User[]> {

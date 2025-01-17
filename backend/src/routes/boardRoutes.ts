@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { boardService } from '../services/boardService';
-import { Board } from '../types';
+import { User } from '../types';
 
 interface CreateBoardRequest {
   title: string;
@@ -9,7 +9,7 @@ interface CreateBoardRequest {
 
 interface UpdateBoardRequest {
   title?: string;
-  users?: string[];
+  users?: User[];
 }
 
 const router = express.Router();

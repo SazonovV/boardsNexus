@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Board, Task, User, TaskStatus } from '../types';
+import { Board, Task, User } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -8,7 +8,7 @@ const api = axios.create({
 });
 
 // Интерцептор для добавления токена к запросам
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: { headers: { Authorization: string; }; }) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -34,7 +34,7 @@ export const apiService = {
     return data;
   },
 
-  async createBoard(title: string, userIds: string[]): Promise<Board> {
+  async createBoard(title: string, userIds: User[]): Promise<Board> {
     const { data } = await api.post('/boards', { title, userIds });
     return data;
   },
