@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 
 interface UserFormData {
   email: string;
@@ -26,14 +26,14 @@ const UsersManagement: React.FC = () => {
   }, []);
 
   const loadUsers = async () => {
-    const data = await api.getUsers();
+    const data = await apiService.getUsers();
     setUsers(data);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.createUser(formData);
+      await apiService.createUser(formData);
       setFormData(initialFormData);
       setShowForm(false);
       loadUsers();
@@ -45,7 +45,7 @@ const UsersManagement: React.FC = () => {
   const handleDeleteUser = async (userId: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await api.deleteUser(userId);
+        await apiService.deleteUser(userId);
         loadUsers();
       } catch (error) {
         console.error('Failed to delete user:', error);

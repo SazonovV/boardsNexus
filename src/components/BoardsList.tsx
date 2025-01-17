@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Board } from '../types';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 const BoardsList: React.FC = () => {
@@ -10,7 +10,7 @@ const BoardsList: React.FC = () => {
 
   useEffect(() => {
     const loadBoards = async () => {
-      const data = await api.getBoards();
+      const data = await apiService.getBoards();
       setBoards(data);
     };
     loadBoards();
@@ -23,7 +23,7 @@ const BoardsList: React.FC = () => {
     if (!title) return;
 
     try {
-      const newBoard = await api.createBoard(title, [user]);
+      const newBoard = await apiService.createBoard(title, [user]);
       setBoards(prev => [...prev, newBoard]);
     } catch (error) {
       console.error('Failed to create board:', error);
