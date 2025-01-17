@@ -1,8 +1,9 @@
-import { Board, User } from '../types';
+import { Board } from '../types';
 import db from '../db';
 
+
 export const boardService = {
-  async createBoard(title: string, userIds: string[]): Promise<Board> {
+  async createBoard(data: { title: string, userIds: string[] }): Promise<Board> {
     const client = await db.connect();
     
     try {
@@ -10,31 +11,22 @@ export const boardService = {
       
       const boardResult = await client.query(
         `INSERT INTO boards (title) VALUES ($1) RETURNING *`,
-        [title]
+        [data.title]
       );
       
       const board = boardResult.rows[0];
       
-      await Promise.all(userIds.map(userId =>
-        client.query(
+      await Promise.all(data.userIds.map(userId => {
+        console.log(board.id, userId);
+        return client.query(
           `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
           [board.id, userId]
         )
+      }
       ));
       
-      const usersResult = await client.query(
-        `SELECT u.* FROM users u
-         JOIN board_users bu ON u.id = bu.user_id
-         WHERE bu.board_id = $1`,
-        [board.id]
-      );
-      
       await client.query('COMMIT');
-      
-      return {
-        ...board,
-        users: usersResult.rows
-      };
+      return board;
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -81,14 +73,12 @@ export const boardService = {
       );
 
       if (data.users) {
-        // Удаляем старые связи
         await client.query(
           `DELETE FROM board_users WHERE board_id = $1`,
           [id]
         );
 
-        // Добавляем новые связи
-        await Promise.all(data.users.map(user =>
+        await Promise.all(data.users.map((user: { id: string }) =>
           client.query(
             `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
             [id, user.id]
@@ -96,19 +86,8 @@ export const boardService = {
         ));
       }
 
-      const usersResult = await client.query(
-        `SELECT u.* FROM users u
-         JOIN board_users bu ON u.id = bu.user_id
-         WHERE bu.board_id = $1`,
-        [id]
-      );
-
       await client.query('COMMIT');
-
-      return {
-        ...boardResult.rows[0],
-        users: usersResult.rows
-      };
+      return boardResult.rows[0];
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;

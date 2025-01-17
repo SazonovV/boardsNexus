@@ -23,7 +23,7 @@ CREATE TABLE board_users (
     board_id UUID REFERENCES boards(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (board_id, user_id)
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid()
 );
 
 -- Создание enum для статусов задач

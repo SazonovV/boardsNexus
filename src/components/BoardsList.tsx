@@ -23,7 +23,7 @@ const BoardsList: React.FC = () => {
     if (!title) return;
 
     try {
-      const newBoard = await apiService.createBoard(title, [user]);
+      const newBoard = await apiService.createBoard(title, [user.id]);
       setBoards(prev => [...prev, newBoard]);
     } catch (error) {
       console.error('Failed to create board:', error);

@@ -39,7 +39,7 @@ export const apiService = {
     return data;
   },
 
-  async createBoard(title: string, userIds: User[]): Promise<Board> {
+  async createBoard(title: string, userIds: string[]): Promise<Board> {
     const { data } = await api.post('/boards', { title, userIds });
     return data;
   },

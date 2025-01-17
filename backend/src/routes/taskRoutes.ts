@@ -47,6 +47,7 @@ router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
     await taskService.deleteTask(req.params.id);
     res.status(204).send();
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });

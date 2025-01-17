@@ -20,16 +20,18 @@ router.get('/', async (req: Request, res: Response) => {
     const boards = await boardService.getBoards(req.user.id);
     res.json(boards);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, async (req: Request<{}, {}, CreateBoardRequest>, res: Response) => {
   try {
     const board = await boardService.createBoard(req.body);
-    await boardService.addUserToBoard(board.id, req.user!);
+    await boardService.addUserToBoard(board.id, req.user);
     res.status(201).json(board);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -39,6 +41,7 @@ router.put('/:id', async (req: Request<{ id: string }, {}, UpdateBoardRequest>, 
     const board = await boardService.updateBoard(req.params.id, req.body);
     res.json(board);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -48,6 +51,7 @@ router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
     await boardService.deleteBoard(req.params.id);
     res.status(204).send();
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });

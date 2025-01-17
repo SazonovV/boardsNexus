@@ -38,6 +38,7 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
     if (error?.message === 'Email already exists') {
       return res.status(400).json({ message: error.message });
     }
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -51,6 +52,7 @@ router.put('/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -61,19 +63,7 @@ router.delete('/:id', authMiddleware, adminMiddleware, async (req, res) => {
     await userService.deleteUser(req.params.id);
     res.status(204).send();
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Получение текущего пользователя
-router.get('/me', authMiddleware, async (req, res) => {
-  try {
-    const user = await userService.getUserById(req.user!.id);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json(user);
-  } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });

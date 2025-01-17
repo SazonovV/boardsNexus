@@ -2,44 +2,31 @@ import { Task, TaskStatus } from '../types';
 import db from '../db';
 
 export const taskService = {
-  async createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
+  async createTask(data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
     const client = await db.connect();
     
     try {
       await client.query('BEGIN');
       
-      const maxPosition = await client.query(
-        `SELECT COALESCE(MAX(position), 0) as max_pos
-         FROM tasks
-         WHERE board_id = $1 AND status = $2`,
-        [taskData.boardId, taskData.status]
-      );
-      
-      const position = maxPosition.rows[0].max_pos + 1;
-      
       const taskResult = await client.query(
         `INSERT INTO tasks (title, description, status, position, board_id)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
-        [taskData.title, taskData.description, taskData.status, position, taskData.boardId]
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [data.title, data.description, data.status, data.position, data.boardId]
       );
       
       const task = taskResult.rows[0];
       
-      await Promise.all(taskData.assignees.map(user =>
-        client.query(
-          `INSERT INTO task_assignees (task_id, user_id)
-           VALUES ($1, $2)`,
-          [task.id, user.id]
-        )
-      ));
+      if (data.assignees) {
+        await Promise.all(data.assignees.map((user: { id: string }) =>
+          client.query(
+            `INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2)`,
+            [task.id, user.id]
+          )
+        ));
+      }
       
       await client.query('COMMIT');
-      
-      return {
-        ...task,
-        assignees: taskData.assignees
-      };
+      return task;
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
