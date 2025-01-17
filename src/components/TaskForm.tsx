@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Task, User, TaskStatus } from '../types';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 
 interface TaskFormProps {
   boardId: string;
@@ -19,7 +19,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
 
   useEffect(() => {
     const loadUsers = async () => {
-      const data = await api.getUsers();
+      const data = await apiService.getUsers();
       setUsers(data);
     };
     loadUsers();
@@ -30,13 +30,13 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
     const assignees = users.filter(user => selectedUsers.includes(user.id));
 
     if (task) {
-      await api.updateTask(task.id, {
+      await apiService.updateTask(task.id, {
         title,
         description,
         assignees,
       });
     } else {
-      await api.createTask(boardId, {
+      await apiService.createTask(boardId, {
         title,
         description,
         assignees,

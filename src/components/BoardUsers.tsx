@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Board, User } from '../types';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 
 interface BoardUsersProps {
   board: Board;
@@ -16,7 +16,7 @@ const BoardUsers: React.FC<BoardUsersProps> = ({ board, onClose, onUpdate }) => 
 
   useEffect(() => {
     const loadUsers = async () => {
-      const users = await api.getUsers();
+      const users = await apiService.getUsers();
       setAllUsers(users);
     };
     loadUsers();
@@ -25,7 +25,7 @@ const BoardUsers: React.FC<BoardUsersProps> = ({ board, onClose, onUpdate }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const updatedUsers = allUsers.filter(user => selectedUsers.includes(user.id));
-    const updatedBoard = await api.updateBoard(board.id, { users: updatedUsers });
+    const updatedBoard = await apiService.updateBoard(board.id, { users: updatedUsers });
     onUpdate(updatedBoard);
     onClose();
   };
