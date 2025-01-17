@@ -7,19 +7,24 @@ interface UserFormData {
   name: string;
   isAdmin: boolean;
   telegramLogin: string;
+  password?: string;
+  generatePassword: boolean;
 }
 
 const initialFormData: UserFormData = {
   email: '',
   name: '',
   isAdmin: false,
-  telegramLogin: ''
+  telegramLogin: '',
+  password: '',
+  generatePassword: true
 };
 
 const UsersManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
+  const [createdUserPassword, setCreatedUserPassword] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -33,13 +38,26 @@ const UsersManagement: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiService.createUser(formData);
+      const { generatePassword, ...userData } = formData;
+      const response = await apiService.createUser({
+        ...userData,
+        password: generatePassword ? undefined : userData.password
+      });
+
+      if ('password' in response) {
+        setCreatedUserPassword(response.password);
+      }
+
       setFormData(initialFormData);
-      setShowForm(false);
       loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
     }
+  };
+
+  const handleClosePasswordModal = () => {
+    setCreatedUserPassword(null);
+    setShowForm(false);
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -97,6 +115,31 @@ const UsersManagement: React.FC = () => {
                 <label>
                   <input
                     type="checkbox"
+                    checked={formData.generatePassword}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      generatePassword: e.target.checked,
+                      password: e.target.checked ? '' : formData.password 
+                    })}
+                  />
+                  Generate Random Password
+                </label>
+              </div>
+              {!formData.generatePassword && (
+                <div className="form-group">
+                  <label>Password:</label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    required
+                  />
+                </div>
+              )}
+              <div className="form-group checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
                     checked={formData.isAdmin}
                     onChange={(e) => setFormData({ ...formData, isAdmin: e.target.checked })}
                   />
@@ -108,6 +151,24 @@ const UsersManagement: React.FC = () => {
                 <button type="button" onClick={() => setShowForm(false)}>Cancel</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {createdUserPassword && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>User Created Successfully</h3>
+            <p>Generated password for the user:</p>
+            <div className="password-display">
+              {createdUserPassword}
+            </div>
+            <p className="password-warning">
+              Please save this password as it won't be shown again!
+            </p>
+            <div className="modal-actions">
+              <button onClick={handleClosePasswordModal}>Close</button>
+            </div>
           </div>
         </div>
       )}

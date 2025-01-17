@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Board, Task, User } from '../types';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -15,6 +15,11 @@ api.interceptors.request.use((config: { headers: { Authorization: string; }; }) 
   }
   return config;
 });
+
+interface CreateUserResponse {
+  user: User;
+  password?: string;
+}
 
 export const apiService = {
   // Auth
@@ -74,7 +79,7 @@ export const apiService = {
     return data;
   },
 
-  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password: string }): Promise<User> {
+  async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }): Promise<CreateUserResponse> {
     const { data } = await api.post('/users', userData);
     return data;
   },
