@@ -8,12 +8,19 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Создаем директорию для инициализации БД если её нет
+# Создаем необходимые директории
 mkdir -p db/init
+mkdir -p db/config
 
 # Проверяем наличие файлов инициализации БД
 if [ ! -f db/init/01-schema.sql ] || [ ! -f db/init/02-seed.sql ]; then
     echo "Database initialization files not found!"
+    exit 1
+fi
+
+# Проверяем наличие конфигурационного файла PostgreSQL
+if [ ! -f db/config/postgresql.conf ]; then
+    echo "PostgreSQL configuration file not found!"
     exit 1
 fi
 

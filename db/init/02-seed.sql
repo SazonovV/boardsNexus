@@ -4,16 +4,12 @@ INSERT INTO users (
     name, 
     password_hash, 
     is_admin, 
-    telegram_login,
-    created_at,
-    updated_at
+    telegram_login
 ) VALUES (
     'admin@example.com',
     'Admin User',
     -- пароль: admin123
-    '$2a$10$rMB1Xj4Y4X9p5YgG5l.cZeq5UNwsH7XIy4qdHtKUyzN8TJk5lEp2q',
+    '$2a$12$/rv59HkgQ/L1Q54uA1GkneWvVb8vvvkkPzo3JFagiQ0S6GBVIqobS',
     true,
-    '@admin',
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
+    '@admin'
 ); 

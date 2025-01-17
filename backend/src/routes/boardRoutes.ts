@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { boardService } from '../services/boardService';
 import { User } from '../types';
+import { authMiddleware } from '../middleware/auth';
 
 interface CreateBoardRequest {
   title: string;
@@ -23,10 +24,10 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request<{}, {}, CreateBoardRequest>, res: Response) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, userIds } = req.body;
-    const board = await boardService.createBoard(title, userIds);
+    const board = await boardService.createBoard(req.body);
+    await boardService.addUserToBoard(board.id, req.user!);
     res.status(201).json(board);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

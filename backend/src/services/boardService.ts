@@ -119,5 +119,12 @@ export const boardService = {
 
   async deleteBoard(id: string): Promise<void> {
     await db.query('DELETE FROM boards WHERE id = $1', [id]);
+  },
+
+  async addUserToBoard(boardId: string, user: { id: string }): Promise<void> {
+    await db.query(
+      'INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)',
+      [boardId, user.id]
+    );
   }
 }; 
