@@ -28,7 +28,6 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', authMiddleware, async (req: Request<{}, {}, CreateBoardRequest>, res: Response) => {
   try {
     const board = await boardService.createBoard(req.body);
-    await boardService.addUserToBoard(board.id, req.user);
     res.status(201).json(board);
   } catch (error) {
     console.log(error);
