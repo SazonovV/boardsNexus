@@ -11,7 +11,7 @@ export type Task = {
   title: string;
   description: string;
   assignees: User[];
-  createdAt: Date;
+  createdAt: string;
   status: TaskStatus;
   boardId: string;
 };

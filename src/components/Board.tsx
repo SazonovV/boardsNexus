@@ -135,7 +135,6 @@ const Board: React.FC = () => {
                             {...provided.dragHandleProps}
                             className={`task-card ${snapshot.isDragging ? 'is-dragging' : ''}`}
                           >
-                            {task.id}
                             <div className="task-header">
                               <h4>{task.title}</h4>
                               <div className="task-actions">

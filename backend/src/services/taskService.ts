@@ -8,10 +8,20 @@ export const taskService = {
     try {
       await client.query('BEGIN');
       
+      // Получаем максимальную позицию для текущего статуса и доски
+      const maxPosition = await client.query(
+        `SELECT COALESCE(MAX(position), 0) as max_pos
+         FROM tasks
+         WHERE board_id = $1 AND status = $2`,
+        [data.boardId, data.status]
+      );
+      
+      const position = maxPosition.rows[0].max_pos + 1;
+      
       const taskResult = await client.query(
         `INSERT INTO tasks (title, description, status, position, board_id)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [data.title, data.description, data.status, data.position, data.boardId]
+        [data.title, data.description, data.status, position, data.boardId]
       );
       
       const task = taskResult.rows[0];
@@ -106,5 +116,62 @@ export const taskService = {
 
   async deleteTask(id: string): Promise<void> {
     await db.query('DELETE FROM tasks WHERE id = $1', [id]);
+  },
+
+  async updateTask(id: string, data: Partial<Task>): Promise<Task> {
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Обновляем основные поля задачи
+      const taskResult = await client.query(
+        `UPDATE tasks 
+         SET title = COALESCE($1, title),
+             description = COALESCE($2, description)
+         WHERE id = $3
+         RETURNING *`,
+        [data.title, data.description, id]
+      );
+
+      // Если переданы исполнители, обновляем их
+      if (data.assignees) {
+        // Удаляем старых исполнителей
+        await client.query(
+          'DELETE FROM task_assignees WHERE task_id = $1',
+          [id]
+        );
+
+        // Добавляем новых исполнителей
+        if (data.assignees.length > 0) {
+          await Promise.all(data.assignees.map(user =>
+            client.query(
+              'INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2)',
+              [id, user.id]
+            )
+          ));
+        }
+      }
+
+      // Получаем обновленных исполнителей
+      const assigneesResult = await client.query(
+        `SELECT u.* FROM users u
+         JOIN task_assignees ta ON u.id = ta.user_id
+         WHERE ta.task_id = $1`,
+        [id]
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        ...taskResult.rows[0],
+        assignees: assigneesResult.rows
+      };
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 }; 

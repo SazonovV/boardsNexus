@@ -19,7 +19,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
 
   useEffect(() => {
     const loadUsers = async () => {
-      const data = await apiService.getUsers();
+      const data = await apiService.getBoardUsers(boardId);
       setUsers(data);
     };
     loadUsers();
@@ -30,7 +30,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
     const assignees = users.filter(user => selectedUsers.includes(user.id));
 
     if (task) {
-      await apiService.updateTask(task.id, {
+      await apiService.updateTaskDetails(task.id, {
         title,
         description,
         assignees,

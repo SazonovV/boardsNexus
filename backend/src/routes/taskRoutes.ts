@@ -16,6 +16,7 @@ router.get('/board/:boardId', async (req: Request<{ boardId: string }>, res: Res
     const tasks = await taskService.getBoardTasks(req.params.boardId);
     res.json(tasks);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -25,11 +26,12 @@ router.post('/', async (req: Request<{}, {}, CreateTaskRequest>, res: Response) 
     const task = await taskService.createTask(req.body);
     res.status(201).json(task);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-router.put('/:id', async (req: Request<{ id: string }, {}, UpdateTaskStatusRequest>, res: Response) => {
+router.put('/:id/move', async (req: Request<{ id: string }, {}, UpdateTaskStatusRequest>, res: Response) => {
   try {
     const task = await taskService.updateTaskStatus(
       req.params.id,
@@ -38,6 +40,7 @@ router.put('/:id', async (req: Request<{ id: string }, {}, UpdateTaskStatusReque
     );
     res.json(task);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -46,6 +49,16 @@ router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
   try {
     await taskService.deleteTask(req.params.id);
     res.status(204).send();
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/:id', async (req: Request<{ id: string }, {}, Partial<Task>>, res: Response) => {
+  try {
+    const task = await taskService.updateTask(req.params.id, req.body);
+    res.json(task);
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: 'Server error' });

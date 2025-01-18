@@ -9,7 +9,7 @@ const router: Router = express.Router();
 
 router.use('/auth', userRoutes);
 router.use('/boards', authMiddleware, boardRoutes);
-router.use('/users', adminMiddleware, userRoutes);
+router.use('/users', authMiddleware, userRoutes);
 router.use('/tasks', authMiddleware, taskRoutes);
 
 export default router; 

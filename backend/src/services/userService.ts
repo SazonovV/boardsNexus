@@ -112,6 +112,7 @@ export const userService = {
       }
 
       delete user.password_hash;
+      console.log(user);
       const token = jwt.sign(
         { id: user.id, email: user.email, isAdmin: user.isAdmin },
         process.env.JWT_SECRET!,

@@ -20,7 +20,7 @@ router.post('/login', async (req, res) => {
 });
 
 // Получение списка пользователей (только для админов)
-router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const users = await userService.getUsers();
     res.json(users);

@@ -65,7 +65,12 @@ export const apiService = {
   },
 
   async updateTask(id: string, taskData: Partial<Task & { position: number }>): Promise<Task> {
-    const { data } = await api.put(`/tasks/${id}`, taskData);
+    const { data } = await api.put(`/tasks/${id}/move`, taskData);
+    return data;
+  },
+
+  async updateTaskDetails(id: string, taskData: Partial<Task>): Promise<Task> {
+    const { data } = await api.patch(`/tasks/${id}`, taskData);
     return data;
   },
 
@@ -86,5 +91,10 @@ export const apiService = {
 
   async deleteUser(id: string): Promise<void> {
     await api.delete(`/users/${id}`);
+  },
+
+  async getBoardUsers(boardId: string): Promise<User[]> {
+    const { data } = await api.get(`/boards/${boardId}/users`);
+    return data;
   }
 }; 

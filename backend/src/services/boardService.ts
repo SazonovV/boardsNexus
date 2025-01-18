@@ -1,4 +1,4 @@
-import { Board } from '../types';
+import { Board, User } from '../types';
 import db from '../db';
 
 
@@ -9,6 +9,17 @@ export const boardService = {
     try {
       await client.query('BEGIN');
       
+      // Проверяем существование пользователей и убираем дубликаты
+      const uniqueUserIds = [...new Set(data.userIds)];
+      const userCheck = await client.query(
+        'SELECT id FROM users WHERE id = ANY($1)',
+        [uniqueUserIds]
+      );
+      
+      if (userCheck.rows.length !== uniqueUserIds.length) {
+        throw new Error('Some users not found');
+      }
+
       const boardResult = await client.query(
         `INSERT INTO boards (title) VALUES ($1) RETURNING *`,
         [data.title]
@@ -16,17 +27,30 @@ export const boardService = {
       
       const board = boardResult.rows[0];
       
-      await Promise.all(data.userIds.map(userId => {
-        console.log(board.id, userId);
-        return client.query(
+      // Используем уникальные ID пользователей
+      await Promise.all(uniqueUserIds.map(userId =>
+        client.query(
           `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
           [board.id, userId]
         )
-      }
       ));
+
+      // Получаем пользователей доски
+      const usersResult = await client.query(
+        `SELECT u.id, u.name, u.email, u.is_admin as "isAdmin", 
+                u.telegram_login as "telegramLogin"
+         FROM users u
+         JOIN board_users bu ON u.id = bu.user_id
+         WHERE bu.board_id = $1`,
+        [board.id]
+      );
       
       await client.query('COMMIT');
-      return board;
+
+      return {
+        ...board,
+        users: usersResult.rows
+      };
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -37,22 +61,24 @@ export const boardService = {
 
   async getBoards(userId: string): Promise<Board[]> {
     const result = await db.query(
-      `SELECT b.*, json_agg(
-         json_build_object(
-           'id', u.id,
-           'name', u.name,
-           'email', u.email,
-           'isAdmin', u.is_admin,
-           'telegramLogin', u.telegram_login
-         )
-       ) as users
+      `SELECT b.*,
+         (
+           SELECT json_agg(
+             json_build_object(
+               'id', u2.id,
+               'name', u2.name,
+               'email', u2.email,
+               'isAdmin', u2.is_admin,
+               'telegramLogin', u2.telegram_login
+             )
+           )
+           FROM board_users bu2
+           JOIN users u2 ON bu2.user_id = u2.id
+           WHERE bu2.board_id = b.id
+         ) as users
        FROM boards b
        JOIN board_users bu ON b.id = bu.board_id
-       JOIN users u ON bu.user_id = u.id
-       WHERE EXISTS (
-         SELECT 1 FROM board_users
-         WHERE board_id = b.id AND user_id = $1
-       )
+       WHERE bu.user_id = $1
        GROUP BY b.id`,
       [userId]
     );
@@ -105,5 +131,17 @@ export const boardService = {
       'INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)',
       [boardId, user.id]
     );
+  },
+
+  async getBoardUsers(boardId: string): Promise<User[]> {
+    const result = await db.query(
+      `SELECT u.id, u.name, u.email, u.is_admin as "isAdmin", 
+              u.telegram_login as "telegramLogin"
+       FROM users u
+       JOIN board_users bu ON u.id = bu.user_id
+       WHERE bu.board_id = $1`,
+      [boardId]
+    );
+    return result.rows;
   }
 }; 

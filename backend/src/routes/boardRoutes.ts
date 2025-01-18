@@ -56,4 +56,14 @@ router.delete('/:id', async (req: Request<{ id: string }>, res: Response) => {
   }
 });
 
+router.get('/:id/users', async (req: Request<{ id: string }>, res: Response) => {
+  try {
+    const users = await boardService.getBoardUsers(req.params.id);
+    res.json(users);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export const boardRoutes = router; 
