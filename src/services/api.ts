@@ -23,10 +23,10 @@ interface CreateUserResponse {
 
 export const apiService = {
   // Auth
-  async login(email: string, password: string) {
-    const { data } = await api.post('/auth/login', { email, password });
+  async login(telegramLogin: string, password: string) {
+    const { data } = await api.post('/auth/login', { telegramLogin, password });
     localStorage.setItem('token', data.token);
-    return data.user;
+    return data;
   },
 
   async logout() {
@@ -95,6 +95,11 @@ export const apiService = {
 
   async getBoardUsers(boardId: string): Promise<User[]> {
     const { data } = await api.get(`/boards/${boardId}/users`);
+    return data;
+  },
+
+  async getBoardTasksByUser(boardId: string): Promise<{ [userId: string]: Task[] }> {
+    const { data } = await api.get(`/tasks/board/${boardId}/by-user`);
     return data;
   }
 }; 

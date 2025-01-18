@@ -1,11 +1,10 @@
 -- Создание таблицы пользователей
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
-    telegram_login VARCHAR(100),
+    telegram_login VARCHAR(100) NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -37,7 +37,7 @@ export const boardService = {
 
       // Получаем пользователей доски
       const usersResult = await client.query(
-        `SELECT u.id, u.name, u.email, u.is_admin as "isAdmin", 
+        `SELECT u.id, u.name, u.is_admin as "isAdmin", 
                 u.telegram_login as "telegramLogin"
          FROM users u
          JOIN board_users bu ON u.id = bu.user_id
@@ -67,7 +67,6 @@ export const boardService = {
              json_build_object(
                'id', u2.id,
                'name', u2.name,
-               'email', u2.email,
                'isAdmin', u2.is_admin,
                'telegramLogin', u2.telegram_login
              )
@@ -135,7 +134,7 @@ export const boardService = {
 
   async getBoardUsers(boardId: string): Promise<User[]> {
     const result = await db.query(
-      `SELECT u.id, u.name, u.email, u.is_admin as "isAdmin", 
+      `SELECT u.id, u.name, u.is_admin as "isAdmin", 
               u.telegram_login as "telegramLogin"
        FROM users u
        JOIN board_users bu ON u.id = bu.user_id

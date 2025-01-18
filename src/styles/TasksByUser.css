@@ -1,0 +1,136 @@
+.tasks-by-user-modal {
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  color: #666;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.tasks-by-user {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.user-tasks {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.user-tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.task-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat {
+  background-color: #e9ecef;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  color: #495057;
+}
+
+.tasks-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.task-item {
+  background-color: white;
+  padding: 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.task-description {
+  color: #666;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.task-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-new {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-in-progress {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.status-on-hold {
+  background-color: #fce4ec;
+  color: #c2185b;
+}
+
+.status-done {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.no-tasks {
+  text-align: center;
+  color: #666;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 8px;
+}
+
+.assignees {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+} 

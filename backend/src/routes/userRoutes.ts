@@ -8,8 +8,8 @@ const router = express.Router();
 // Аутентификация
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const result = await userService.login(email, password);
+    const { telegramLogin, password } = req.body;
+    const result = await userService.login(telegramLogin, password);
     if (!result) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -35,7 +35,7 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
     const result = await userService.createUser(req.body);
     res.status(201).json(result);
   } catch (error: any) {
-    if (error?.message === 'Email already exists') {
+    if (error?.message === 'telegramLogin already exists') {
       return res.status(400).json({ message: error.message });
     }
     console.log(error);

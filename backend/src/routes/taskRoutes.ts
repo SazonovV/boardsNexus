@@ -65,4 +65,14 @@ router.patch('/:id', async (req: Request<{ id: string }, {}, Partial<Task>>, res
   }
 });
 
+router.get('/board/:boardId/by-user', async (req: Request<{ boardId: string }>, res: Response) => {
+  try {
+    const tasks = await taskService.getBoardTasksByUser(req.params.boardId);
+    res.json(tasks);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export const taskRoutes = router; 

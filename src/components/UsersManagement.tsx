@@ -3,7 +3,6 @@ import { User } from '../types';
 import { apiService } from '../services/api';
 
 interface UserFormData {
-  email: string;
   name: string;
   isAdmin: boolean;
   telegramLogin: string;
@@ -12,7 +11,6 @@ interface UserFormData {
 }
 
 const initialFormData: UserFormData = {
-  email: '',
   name: '',
   isAdmin: false,
   telegramLogin: '',
@@ -95,20 +93,12 @@ const UsersManagement: React.FC = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Email:</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="form-group">
                 <label>Telegram Login:</label>
                 <input
                   type="text"
                   value={formData.telegramLogin}
                   onChange={(e) => setFormData({ ...formData, telegramLogin: e.target.value })}
+                  required
                 />
               </div>
               <div className="form-group checkbox-group">
@@ -178,7 +168,6 @@ const UsersManagement: React.FC = () => {
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
               <th>Telegram</th>
               <th>Role</th>
               <th>Actions</th>
@@ -188,7 +177,6 @@ const UsersManagement: React.FC = () => {
             {users.map(user => (
               <tr key={user.id}>
                 <td>{user.name}</td>
-                <td>{user.email}</td>
                 <td>{user.telegramLogin || '-'}</td>
                 <td>{user.isAdmin ? 'Admin' : 'User'}</td>
                 <td>

@@ -97,7 +97,6 @@ export const taskService = {
          json_build_object(
            'id', u.id,
            'name', u.name,
-           'email', u.email,
            'isAdmin', u.is_admin,
            'telegramLogin', u.telegram_login
          )
@@ -173,5 +172,55 @@ export const taskService = {
     } finally {
       client.release();
     }
+  },
+
+  async getBoardTasksByUser(boardId: string): Promise<{ [userKey: string]: Task[] }> {
+    const result = await db.query(
+      `SELECT 
+        u.id as user_id,
+        u.telegram_login as telegram_login,
+        json_agg(
+          json_build_object(
+            'id', t.id,
+            'title', t.title,
+            'description', t.description,
+            'status', t.status,
+            'position', t.position,
+            'boardId', t.board_id,
+            'createdAt', t.created_at,
+            'assignees', (
+              SELECT json_agg(
+                json_build_object(
+                  'id', u2.id,
+                  'name', u2.name,
+                  'isAdmin', u2.is_admin,
+                  'telegramLogin', u2.telegram_login
+                )
+              )
+              FROM task_assignees ta2
+              JOIN users u2 ON ta2.user_id = u2.id
+              WHERE ta2.task_id = t.id
+            )
+          )
+        ) FILTER (WHERE t.id IS NOT NULL) as tasks
+      FROM users u
+      JOIN board_users bu ON u.id = bu.user_id
+      LEFT JOIN task_assignees ta ON u.id = ta.user_id
+      LEFT JOIN tasks t ON ta.task_id = t.id AND t.board_id = $1
+      WHERE bu.board_id = $1
+      GROUP BY u.id, u.telegram_login
+      HAVING COUNT(t.id) > 0`,
+      [boardId]
+    );
+
+    const tasksByUser: { [userKey: string]: Task[] } = {};
+    result.rows.forEach(row => {
+      const key = row.telegram_login || row.user_id;
+      if (row.tasks && row.tasks.length > 0) {
+        tasksByUser[key] = row.tasks;
+      }
+    });
+
+    return tasksByUser;
   }
 }; 

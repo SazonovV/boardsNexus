@@ -6,6 +6,7 @@ import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import TaskForm from './TaskForm';
 import BoardUsers from './BoardUsers';
+import TasksByUser from './TasksByUser';
 
 const Board: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,8 @@ const Board: React.FC = () => {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
   const [showUsersModal, setShowUsersModal] = useState(false);
+  const [showTasksByUser, setShowTasksByUser] = useState(false);
+  const [tasksByUser, setTasksByUser] = useState<{ [key: string]: Task[] }>({});
   const { user } = useAuth();
 
   useEffect(() => {
@@ -90,6 +93,16 @@ const Board: React.FC = () => {
     }
   };
 
+  const handleShowTasksByUser = async () => {
+    try {
+      const data = await apiService.getBoardTasksByUser(id);
+      setTasksByUser(data);
+      setShowTasksByUser(true);
+    } catch (error) {
+      console.error('Failed to load tasks by user:', error);
+    }
+  };
+
   if (!board) return <div>Loading...</div>;
 
   const columns = Object.values(TaskStatus).map(status => ({
@@ -107,6 +120,7 @@ const Board: React.FC = () => {
           {user?.isAdmin && (
             <button onClick={() => setShowUsersModal(true)}>Manage Users</button>
           )}
+          <button onClick={handleShowTasksByUser}>Show Tasks by User</button>
         </div>
       </div>
 
@@ -180,6 +194,13 @@ const Board: React.FC = () => {
           board={board}
           onClose={() => setShowUsersModal(false)}
           onUpdate={setBoard}
+        />
+      )}
+
+      {showTasksByUser && (
+        <TasksByUser
+          tasks={tasksByUser}
+          onClose={() => setShowTasksByUser(false)}
         />
       )}
     </div>

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 
 interface JwtPayload {
   id: string;
-  email: string;
+  telegramLogin: string;
   isAdmin: boolean;
 }
 

@@ -1,9 +1,8 @@
 export type User = {
   id: string;
-  email: string;
   name: string;
   isAdmin: boolean;
-  telegramLogin?: string;
+  telegramLogin: string;
 };
 
 export type Task = {

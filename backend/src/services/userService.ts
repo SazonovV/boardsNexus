@@ -6,21 +6,21 @@ import jwt from 'jsonwebtoken';
 
 export const userService = {
   async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }): Promise<{ user: User; password?: string }> {
-    // Проверка существования email
-    const existingUser = await db.query('SELECT id FROM users WHERE email = $1', [userData.email]);
+    // Проверка существования telegram_login
+    const existingUser = await db.query('SELECT id FROM users WHERE telegram_login = $1', [userData.telegramLogin]);
     if (existingUser.rows.length > 0) {
-      throw new Error('Email already exists');
+      throw new Error('Telegram login already exists');
     }
 
     const password = userData.password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(password, 12);
     
     const result = await db.query(
-      `INSERT INTO users (email, name, password_hash, is_admin, telegram_login)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, email, name, is_admin as "isAdmin", telegram_login as "telegramLogin", 
+      `INSERT INTO users (name, password_hash, is_admin, telegram_login)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin", 
                 created_at as "createdAt", updated_at as "updatedAt"`,
-      [userData.email, userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
+      [userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
     );
     
     return {
@@ -34,11 +34,6 @@ export const userService = {
     const values = [];
     let valueIndex = 1;
 
-    if (userData.email) {
-      updateFields.push(`email = $${valueIndex}`);
-      values.push(userData.email);
-      valueIndex++;
-    }
     if (userData.name) {
       updateFields.push(`name = $${valueIndex}`);
       values.push(userData.name);
@@ -62,7 +57,7 @@ export const userService = {
       `UPDATE users 
        SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
        WHERE id = $${valueIndex}
-       RETURNING id, email, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
+       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
                 created_at as "createdAt", updated_at as "updatedAt"`,
       values
     );
@@ -72,7 +67,7 @@ export const userService = {
 
   async getUserById(id: string): Promise<User | null> {
     const result = await db.query(
-      `SELECT id, email, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
+      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
               created_at as "createdAt", updated_at as "updatedAt"
        FROM users WHERE id = $1`,
       [id]
@@ -82,39 +77,39 @@ export const userService = {
 
   async getUsers(): Promise<User[]> {
     const result = await db.query(
-      `SELECT id, email, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
+      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
               created_at as "createdAt", updated_at as "updatedAt"
        FROM users`
     );
     return result.rows;
   },
 
-  async login(email: string, password: string): Promise<{ user: User; token: string } | null> {
+  async login(telegramLogin: string, password: string): Promise<{ user: User; token: string } | null> {
     try {
       const result = await db.query(
-        `SELECT id, email, name, password_hash, is_admin as "isAdmin", 
+        `SELECT id, name, password_hash, is_admin as "isAdmin", 
                 telegram_login as "telegramLogin", created_at as "createdAt", 
                 updated_at as "updatedAt"
-         FROM users WHERE email = $1`,
-        [email]
+         FROM users WHERE telegram_login = $1`,
+        [telegramLogin]
       );
 
       const user = result.rows[0];
       if (!user) {
-        console.log('User not found:', email);
+        console.log('User not found:', telegramLogin);
         return null;
       }
 
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
-        console.log('Invalid password for user:', email);
+        console.log('Invalid password for user:', telegramLogin);
         return null;
       }
 
       delete user.password_hash;
       console.log(user);
       const token = jwt.sign(
-        { id: user.id, email: user.email, isAdmin: user.isAdmin },
+        { id: user.id, telegramLogin: user.telegramLogin, isAdmin: user.isAdmin },
         process.env.JWT_SECRET!,
         { expiresIn: '24h' }
       );

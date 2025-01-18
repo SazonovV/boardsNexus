@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User } from '../types';
 import { apiService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (telegramLogin: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,10 +27,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const user = await apiService.login(email, password);
-    setUser(user);
-  }, []);
+  const navigate = useNavigate();
+
+  const login = async (telegramLogin: string, password: string) => {
+    try {
+      const data = await apiService.login(telegramLogin, password);
+      setUser(data.user);
+      navigate('/');
+    } catch (error) {
+      throw new Error('Login failed');
+    }
+  };
 
   const logout = useCallback(() => {
     apiService.logout();

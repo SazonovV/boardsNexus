@@ -2,10 +2,9 @@ import { Request } from 'express';
 
 export interface User {
     id: string;
-    email: string;
     name: string;
     isAdmin: boolean;
-    telegramLogin?: string;
+    telegramLogin: string;
     createdAt: Date;
     updatedAt: Date;
     password_hash?: string;
@@ -51,7 +50,7 @@ declare global {
     interface Request {
       user: {
         id: string;
-        email: string;
+        telegramLogin: string;
         isAdmin: boolean;
       };
     }
