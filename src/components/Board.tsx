@@ -95,6 +95,7 @@ const Board: React.FC = () => {
 
   const handleShowTasksByUser = async () => {
     try {
+      if (!id) return;
       const data = await apiService.getBoardTasksByUser(id);
       setTasksByUser(data);
       setShowTasksByUser(true);
