@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Pull latest changes
+git pull
+
 # Проверяем наличие .env файла
 if [ ! -f .env ]; then
     echo "Creating .env file from .env.example"
@@ -26,11 +29,11 @@ fi
 
 # Останавливаем и удаляем старые контейнеры
 echo "Stopping and removing old containers..."
-docker-compose down -v
+docker compose down -v
 
 # Запускаем Docker Compose
 echo "Starting Docker Compose..."
-docker-compose up -d
+docker compose up -d
 
 # Ждем, пока база данных будет готова
 echo "Waiting for database to be ready..."
@@ -38,13 +41,13 @@ sleep 10
 
 # Проверяем статус сервисов
 echo "Checking services status..."
-docker-compose ps
+docker compose ps
 
 # Проверяем, что таблицы созданы
 echo "Checking database tables..."
-docker-compose exec postgres psql -U postgres -d boards_nexus -c "\dt"
+docker compose exec postgres psql -U postgres -d boards_nexus -c "\dt"
 
-echo "Deployment completed!"
+echo "Deployment completed successfully!"
 echo "Frontend: http://localhost"
 echo "Backend: http://localhost:3001"
 echo "Database: localhost:5433"
