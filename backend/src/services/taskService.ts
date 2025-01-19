@@ -1,5 +1,12 @@
 import { Task, TaskStatus } from '../types';
 import db from '../db';
+import { CreatePublicTaskRequest } from '../routes/publicRoutes';
+
+interface TaskSummary {
+  title: string;
+  description: string;
+  status: TaskStatus;
+}
 
 export const taskService = {
   async createTask(data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { authorTelegramLogin: string }): Promise<Task> {
@@ -263,6 +270,109 @@ export const taskService = {
       const key = row.telegram_login || row.user_id;
       if (row.tasks && row.tasks.length > 0) {
         tasksByUser[key] = row.tasks;
+      }
+    });
+
+    return tasksByUser;
+  },
+
+  async createPublicTask(data: CreatePublicTaskRequest): Promise<Task> {
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Получаем id автора по telegram_login
+      const authorResult = await client.query(
+        'SELECT id FROM users WHERE telegram_login = $1',
+        [data.authorTelegramLogin]
+      );
+      
+      if (authorResult.rows.length === 0) {
+        throw new Error('Author not found');
+      }
+      
+      const authorId = authorResult.rows[0].id;
+      
+      // Получаем максимальную позицию
+      const maxPosition = await client.query(
+        `SELECT COALESCE(MAX(position), 0) as max_pos
+         FROM tasks
+         WHERE board_id = $1 AND status = $2`,
+        [data.boardId, data.status]
+      );
+      
+      const position = maxPosition.rows[0].max_pos + 1;
+      
+      // Создаем задачу
+      const taskResult = await client.query(
+        `INSERT INTO tasks (title, description, status, position, board_id, author_id)
+         VALUES ($1, $2, $3, $4, $5, $6) 
+         RETURNING *`,
+        [data.title, data.description, data.status, position, data.boardId, authorId]
+      );
+      
+      const task = taskResult.rows[0];
+
+      // Добавляем исполнителей, если они указаны
+      if (data.assignees && data.assignees.length > 0) {
+        const assigneeIds = await Promise.all(
+          data.assignees.map(async (assignee) => {
+            const result = await client.query(
+              'SELECT id FROM users WHERE telegram_login = $1',
+              [assignee.telegramLogin]
+            );
+            return result.rows[0]?.id;
+          })
+        );
+
+        const validAssigneeIds = assigneeIds.filter(id => id);
+        
+        await Promise.all(
+          validAssigneeIds.map(assigneeId =>
+            client.query(
+              `INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2)`,
+              [task.id, assigneeId]
+            )
+          )
+        );
+      }
+
+      await client.query('COMMIT');
+      return task;
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  },
+
+  async getPublicBoardTasksSummary(boardId: string): Promise<{ [telegramLogin: string]: TaskSummary[] }> {
+    const result = await db.query(
+      `SELECT 
+        u.telegram_login,
+        json_agg(
+          json_build_object(
+            'title', t.title,
+            'description', t.description,
+            'status', t.status
+          )
+        ) FILTER (WHERE t.id IS NOT NULL) as tasks
+      FROM users u
+      JOIN board_users bu ON u.id = bu.user_id
+      LEFT JOIN task_assignees ta ON u.id = ta.user_id
+      LEFT JOIN tasks t ON ta.task_id = t.id AND t.board_id = $1
+      WHERE bu.board_id = $1
+      GROUP BY u.telegram_login
+      HAVING COUNT(t.id) > 0`,
+      [boardId]
+    );
+
+    const tasksByUser: { [key: string]: TaskSummary[] } = {};
+    result.rows.forEach(row => {
+      if (row.tasks && row.tasks.length > 0) {
+        tasksByUser[row.telegram_login] = row.tasks;
       }
     });
 
