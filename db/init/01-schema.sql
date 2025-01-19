@@ -36,6 +36,7 @@ CREATE TABLE tasks (
     status task_status DEFAULT 'new',
     position INTEGER NOT NULL,
     board_id UUID REFERENCES boards(id) ON DELETE CASCADE,
+    author_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

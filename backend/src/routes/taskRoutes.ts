@@ -23,11 +23,19 @@ router.get('/board/:boardId', async (req: Request<{ boardId: string }>, res: Res
 
 router.post('/', async (req: Request<{}, {}, CreateTaskRequest>, res: Response) => {
   try {
-    const task = await taskService.createTask(req.body);
+    const taskData = {
+      ...req.body,
+      authorTelegramLogin: req.user.telegramLogin // Используем telegram_login из JWT токена
+    };
+    const task = await taskService.createTask(taskData);
     res.status(201).json(task);
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: 'Server error' });
+    if (error instanceof Error && error.message === 'Author not found') {
+      res.status(400).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
   }
 });
 
