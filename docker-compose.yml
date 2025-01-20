@@ -43,7 +43,7 @@ services:
   frontend:
     build: .
     ports:
-      - "80:80"
+      - "8080:80"
     environment:
       - VITE_API_URL=http://localhost:3001/api
     depends_on:
