@@ -7,6 +7,6 @@ INSERT INTO users (
 ) VALUES (
     'Admin User',
     'admin',
-    '$2a$12$64XweW3aE3aGRgx1Qcr0yeptSxT/ofe49noEbByy3Lr/CulZLVbcy', -- admin123
+    '$2a$12$/rv59HkgQ/L1Q54uA1GkneWvVb8vvvkkPzo3JFagiQ0S6GBVIqobS', -- admin123
     true
 ); 

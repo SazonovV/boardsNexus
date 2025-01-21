@@ -14,6 +14,9 @@ COPY . .
 # Собираем приложение
 RUN npm run build
 
+# Копируем Docker конфиг
+COPY .env.docker .env
+
 # Удаляем dev зависимости
 RUN npm prune --production
 
