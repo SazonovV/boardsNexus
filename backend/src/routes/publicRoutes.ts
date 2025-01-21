@@ -25,12 +25,20 @@ router.post('/tasks', async (req: Request<{}, {}, CreatePublicTaskRequest>, res:
       });
     }
 
+    console.log({
+        ...taskData,
+        status: taskData.status || TaskStatus.NEW,
+        authorTelegramLogin,
+        assignees: assignees || []
+      });
+
     const task = await taskService.createPublicTask({
       ...taskData,
       status: taskData.status || TaskStatus.NEW,
       authorTelegramLogin,
       assignees: assignees || []
     });
+    console.log(task);
 
     res.status(201).json(task);
   } catch (error) {
