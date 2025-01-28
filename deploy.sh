@@ -54,4 +54,5 @@ echo "Database: localhost:5433"
 echo ""
 echo "Default admin credentials:"
 echo "Email: admin@example.com"
-echo "Password: admin123"
+echo "Password: admin123" 
+250936f5
