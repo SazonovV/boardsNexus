@@ -1,30 +1,53 @@
 import { User } from '../types';
-import db from '../db';
+import db, { UserRow } from '../db';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { ResultSetHeader } from 'mysql2';
+import { RowDataPacket } from 'mysql2';
+
+const mapUserRowToUser = (row: UserRow): User => ({
+  id: row.id,
+  name: row.name,
+  isAdmin: row.is_admin,
+  telegramLogin: row.telegram_login,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at
+});
 
 export const userService = {
   async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }): Promise<{ user: User; password?: string }> {
-    // Проверка существования telegram_login
-    const existingUser = await db.query('SELECT id FROM users WHERE telegram_login = $1', [userData.telegramLogin]);
-    if (existingUser.rows.length > 0) {
+    const [existingUsers] = await db.query<UserRow[]>(
+      'SELECT id FROM users WHERE telegram_login = ?',
+      [userData.telegramLogin]
+    );
+    
+    if (existingUsers.length > 0) {
       throw new Error('Telegram login already exists');
     }
 
     const password = userData.password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(password, 12);
     
-    const result = await db.query(
-      `INSERT INTO users (name, password_hash, is_admin, telegram_login)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin", 
-                created_at as "createdAt", updated_at as "updatedAt"`,
-      [userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
+    const [[{ userId }]] = await db.query<(RowDataPacket & { userId: string })[]>(
+      'SELECT UUID() as userId'
+    );
+
+    await db.query(
+      `INSERT INTO users (id, name, password_hash, is_admin, telegram_login)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
+    );
+    
+    const [newUsers] = await db.query<UserRow[]>(
+      `SELECT id, name, is_admin, telegram_login, 
+              created_at, updated_at
+       FROM users WHERE id = ?`,
+      [userId]
     );
     
     return {
-      user: result.rows[0],
+      user: mapUserRowToUser(newUsers[0]),
       password: userData.password ? undefined : password
     };
   },
@@ -32,69 +55,71 @@ export const userService = {
   async updateUser(id: string, userData: Partial<User>): Promise<User | null> {
     const updateFields = [];
     const values = [];
-    let valueIndex = 1;
 
     if (userData.name) {
-      updateFields.push(`name = $${valueIndex}`);
+      updateFields.push('name = ?');
       values.push(userData.name);
-      valueIndex++;
     }
     if (userData.isAdmin !== undefined) {
-      updateFields.push(`is_admin = $${valueIndex}`);
+      updateFields.push('is_admin = ?');
       values.push(userData.isAdmin);
-      valueIndex++;
     }
     if (userData.telegramLogin) {
-      updateFields.push(`telegram_login = $${valueIndex}`);
+      updateFields.push('telegram_login = ?');
       values.push(userData.telegramLogin);
-      valueIndex++;
     }
 
     if (updateFields.length === 0) return null;
 
     values.push(id);
-    const result = await db.query(
+    const [result] = await db.query<ResultSetHeader>(
       `UPDATE users 
-       SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $${valueIndex}
-       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-                created_at as "createdAt", updated_at as "updatedAt"`,
+       SET ${updateFields.join(', ')}
+       WHERE id = ?`,
       values
     );
 
-    return result.rows[0] || null;
+    if (result.affectedRows === 0) return null;
+
+    const [updatedUsers] = await db.query<UserRow[]>(
+      `SELECT id, name, is_admin, telegram_login,
+              created_at, updated_at
+       FROM users WHERE id = ?`,
+      [id]
+    );
+
+    return updatedUsers[0] ? mapUserRowToUser(updatedUsers[0]) : null;
   },
 
   async getUserById(id: string): Promise<User | null> {
-    const result = await db.query(
-      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-              created_at as "createdAt", updated_at as "updatedAt"
-       FROM users WHERE id = $1`,
+    const [users] = await db.query<UserRow[]>(
+      `SELECT id, name, is_admin, telegram_login,
+              created_at, updated_at
+       FROM users WHERE id = ?`,
       [id]
     );
-    return result.rows[0] || null;
+    return users[0] ? mapUserRowToUser(users[0]) : null;
   },
 
   async getUsers(): Promise<User[]> {
-    const result = await db.query(
-      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-              created_at as "createdAt", updated_at as "updatedAt"
+    const [users] = await db.query<UserRow[]>(
+      `SELECT id, name, is_admin, telegram_login,
+              created_at, updated_at
        FROM users`
     );
-    return result.rows;
+    return users.map(mapUserRowToUser);
   },
 
   async login(telegramLogin: string, password: string): Promise<{ user: User; token: string } | null> {
     try {
-      const result = await db.query(
-        `SELECT id, name, password_hash, is_admin as "isAdmin", 
-                telegram_login as "telegramLogin", created_at as "createdAt", 
-                updated_at as "updatedAt"
-         FROM users WHERE telegram_login = $1`,
+      const [users] = await db.query<(UserRow & { password_hash: string })[]>(
+        `SELECT id, name, password_hash, is_admin, 
+                telegram_login, created_at, updated_at
+         FROM users WHERE telegram_login = ?`,
         [telegramLogin]
       );
 
-      const user = result.rows[0];
+      const user = users[0];
       if (!user) {
         console.log('User not found:', telegramLogin);
         return null;
@@ -106,15 +131,15 @@ export const userService = {
         return null;
       }
 
-      delete user.password_hash;
-      console.log(user);
+      const { password_hash, ...userRow } = user;
+      const mappedUser = mapUserRowToUser(userRow);
       const token = jwt.sign(
-        { id: user.id, telegramLogin: user.telegramLogin, isAdmin: user.isAdmin },
+        { id: mappedUser.id, telegramLogin: mappedUser.telegramLogin, isAdmin: mappedUser.isAdmin },
         process.env.JWT_SECRET!,
         { expiresIn: '24h' }
       );
 
-      return { user, token };
+      return { user: mappedUser, token };
     } catch (error) {
       console.error('Login error:', error);
       return null;
@@ -122,6 +147,6 @@ export const userService = {
   },
 
   async deleteUser(id: string): Promise<void> {
-    await db.query('DELETE FROM users WHERE id = $1', [id]);
+    await db.query('DELETE FROM users WHERE id = ?', [id]);
   }
 }; 

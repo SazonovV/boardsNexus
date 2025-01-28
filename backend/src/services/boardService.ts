@@ -1,146 +1,199 @@
 import { Board, User } from '../types';
-import db from '../db';
+import db, { BoardRow, UserRow } from '../db';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 
+const mapUserRowToUser = (row: UserRow): User => ({
+  id: row.id,
+  name: row.name,
+  isAdmin: row.is_admin,
+  telegramLogin: row.telegram_login,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at
+});
+
+const mapBoardRowToBoard = (row: BoardRow, users: User[] = []): Board => ({
+  id: row.id,
+  title: row.title,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  users
+});
 
 export const boardService = {
   async createBoard(data: { title: string, userIds: string[] }): Promise<Board> {
-    const client = await db.connect();
+    const connection = await db.getConnection();
     
     try {
-      await client.query('BEGIN');
+      await connection.beginTransaction();
       
       // Проверяем существование пользователей и убираем дубликаты
       const uniqueUserIds = [...new Set(data.userIds)];
-      const userCheck = await client.query(
-        'SELECT id FROM users WHERE id = ANY($1)',
-        [uniqueUserIds]
+      const placeholders = uniqueUserIds.map(() => '?').join(',');
+      const [userCheck] = await connection.query<UserRow[]>(
+        `SELECT id FROM users WHERE id IN (${placeholders})`,
+        uniqueUserIds
       );
       
-      if (userCheck.rows.length !== uniqueUserIds.length) {
+      if (!Array.isArray(userCheck) || userCheck.length !== uniqueUserIds.length) {
         throw new Error('Some users not found');
       }
 
-      const boardResult = await client.query(
-        `INSERT INTO boards (title) VALUES ($1) RETURNING *`,
-        [data.title]
+      // Генерируем UUID для новой доски
+      const [[{ boardId }]] = await connection.query<(RowDataPacket & { boardId: string })[]>(
+        'SELECT UUID() as boardId'
       );
-      
-      const board = boardResult.rows[0];
+
+      // Создаем доску с сгенерированным UUID
+      await connection.query<ResultSetHeader>(
+        'INSERT INTO boards (id, title) VALUES (?, ?)',
+        [boardId, data.title]
+      );
       
       // Используем уникальные ID пользователей
       await Promise.all(uniqueUserIds.map(userId =>
-        client.query(
-          `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
-          [board.id, userId]
+        connection.query(
+          'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
+          [boardId, userId]
         )
       ));
 
       // Получаем пользователей доски
-      const usersResult = await client.query(
-        `SELECT u.id, u.name, u.is_admin as "isAdmin", 
-                u.telegram_login as "telegramLogin"
+      const [usersResult] = await connection.query<UserRow[]>(
+        `SELECT u.id, u.name, u.is_admin, 
+                u.telegram_login, u.created_at, u.updated_at
          FROM users u
          JOIN board_users bu ON u.id = bu.user_id
-         WHERE bu.board_id = $1`,
-        [board.id]
+         WHERE bu.board_id = ?`,
+        [boardId]
+      );
+
+      const [boardRows] = await connection.query<BoardRow[]>(
+        'SELECT * FROM boards WHERE id = ?',
+        [boardId]
       );
       
-      await client.query('COMMIT');
+      await connection.commit();
 
-      return {
-        ...board,
-        users: usersResult.rows
-      };
+      return mapBoardRowToBoard(boardRows[0], usersResult.map(mapUserRowToUser));
     } catch (e) {
-      await client.query('ROLLBACK');
+      await connection.rollback();
       throw e;
     } finally {
-      client.release();
+      connection.release();
     }
   },
 
   async getBoards(userId: string): Promise<Board[]> {
-    const result = await db.query(
-      `SELECT b.*,
-         (
-           SELECT json_agg(
-             json_build_object(
-               'id', u2.id,
-               'name', u2.name,
-               'isAdmin', u2.is_admin,
-               'telegramLogin', u2.telegram_login
+    const [result] = await db.query<(BoardRow & { users_json: string | null })[]>(
+      `SELECT b.*, 
+         COALESCE(
+           JSON_ARRAYAGG(
+             JSON_OBJECT(
+               'id', u.id,
+               'name', u.name,
+               'is_admin', u.is_admin,
+               'telegram_login', u.telegram_login,
+               'created_at', u.created_at,
+               'updated_at', u.updated_at
              )
-           )
-           FROM board_users bu2
-           JOIN users u2 ON bu2.user_id = u2.id
-           WHERE bu2.board_id = b.id
-         ) as users
+           ),
+           '[]'
+         ) as users_json
        FROM boards b
-       JOIN board_users bu ON b.id = bu.board_id
-       WHERE bu.user_id = $1
-       GROUP BY b.id`,
+       LEFT JOIN board_users bu ON b.id = bu.board_id
+       LEFT JOIN users u ON bu.user_id = u.id
+       WHERE EXISTS (
+         SELECT 1 FROM board_users 
+         WHERE board_id = b.id AND user_id = ?
+       )
+       GROUP BY b.id, b.title, b.created_at, b.updated_at`,
       [userId]
     );
     
-    return result.rows;
+    return result.map(row => {
+      const users = JSON.parse(row.users_json || '[]').map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        isAdmin: u.is_admin,
+        telegramLogin: u.telegram_login,
+        createdAt: u.created_at,
+        updatedAt: u.updated_at
+      }));
+      return mapBoardRowToBoard(row, users);
+    });
   },
 
   async updateBoard(id: string, data: Partial<Board>): Promise<Board> {
-    const client = await db.connect();
+    const connection = await db.getConnection();
     
     try {
-      await client.query('BEGIN');
+      await connection.beginTransaction();
       
-      const boardResult = await client.query(
-        `UPDATE boards SET title = COALESCE($1, title)
-         WHERE id = $2 RETURNING *`,
-        [data.title, id]
-      );
+      if (data.title) {
+        await connection.query(
+          'UPDATE boards SET title = ? WHERE id = ?',
+          [data.title, id]
+        );
+      }
 
       if (data.users) {
-        await client.query(
-          `DELETE FROM board_users WHERE board_id = $1`,
+        await connection.query(
+          'DELETE FROM board_users WHERE board_id = ?',
           [id]
         );
 
-        await Promise.all(data.users.map((user: { id: string }) =>
-          client.query(
-            `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
+        await Promise.all(data.users.map((user: User) =>
+          connection.query(
+            'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
             [id, user.id]
           )
         ));
       }
 
-      await client.query('COMMIT');
-      return boardResult.rows[0];
+      const [boardRows] = await connection.query<BoardRow[]>(
+        'SELECT * FROM boards WHERE id = ?',
+        [id]
+      );
+
+      const [usersResult] = await connection.query<UserRow[]>(
+        `SELECT u.id, u.name, u.is_admin, 
+                u.telegram_login, u.created_at, u.updated_at
+         FROM users u
+         JOIN board_users bu ON u.id = bu.user_id
+         WHERE bu.board_id = ?`,
+        [id]
+      );
+
+      await connection.commit();
+      return mapBoardRowToBoard(boardRows[0], usersResult.map(mapUserRowToUser));
     } catch (e) {
-      await client.query('ROLLBACK');
+      await connection.rollback();
       throw e;
     } finally {
-      client.release();
+      connection.release();
     }
   },
 
   async deleteBoard(id: string): Promise<void> {
-    await db.query('DELETE FROM boards WHERE id = $1', [id]);
+    await db.query('DELETE FROM boards WHERE id = ?', [id]);
   },
 
-  async addUserToBoard(boardId: string, user: { id: string }): Promise<void> {
+  async addUserToBoard(boardId: string, user: User): Promise<void> {
     await db.query(
-      'INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)',
+      'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
       [boardId, user.id]
     );
   },
 
   async getBoardUsers(boardId: string): Promise<User[]> {
-    const result = await db.query(
-      `SELECT u.id, u.name, u.is_admin as "isAdmin", 
-              u.telegram_login as "telegramLogin"
+    const [result] = await db.query<UserRow[]>(
+      `SELECT u.id, u.name, u.is_admin, 
+              u.telegram_login, u.created_at, u.updated_at
        FROM users u
        JOIN board_users bu ON u.id = bu.user_id
-       WHERE bu.board_id = $1`,
+       WHERE bu.board_id = ?`,
       [boardId]
     );
-    return result.rows;
+    return result.map(mapUserRowToUser);
   }
 }; 

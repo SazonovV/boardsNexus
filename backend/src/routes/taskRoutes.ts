@@ -27,10 +27,11 @@ router.post('/', async (req: Request<{}, {}, CreateTaskRequest>, res: Response) 
       ...req.body,
       authorTelegramLogin: req.user.telegramLogin // Используем telegram_login из JWT токена
     };
+    
     const task = await taskService.createTask(taskData);
     res.status(201).json(task);
   } catch (error) {
-    console.log(error);
+    console.error('Create task error:', error);
     if (error instanceof Error && error.message === 'Author not found') {
       res.status(400).json({ message: error.message });
     } else {

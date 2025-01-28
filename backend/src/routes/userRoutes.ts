@@ -10,6 +10,7 @@ router.post('/login', async (req, res) => {
   try {
     const { telegramLogin, password } = req.body;
     const result = await userService.login(telegramLogin, password);
+    console.log(result);
     if (!result) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
