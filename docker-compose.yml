@@ -4,9 +4,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       - NODE_ENV=production
+      - DB_HOST=nexusboards.online
+      - DB_USER=nexus_board_usr
+      - DB_PASSWORD=123qWe098
+      - DB_NAME=nexus_boards
+      - DB_PORT=3306
 
   frontend:
     build: .
@@ -16,6 +21,5 @@ services:
       - VITE_API_URL=http://localhost:3001/api
     depends_on:
       - backend
-
 volumes:
   mysql_data: 

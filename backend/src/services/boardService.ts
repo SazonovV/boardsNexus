@@ -1,146 +1,146 @@
 import { Board, User } from '../types';
 import db from '../db';
 
-
 export const boardService = {
   async createBoard(data: { title: string, userIds: string[] }): Promise<Board> {
-    const client = await db.connect();
+    const connection = await db.getConnection();
     
     try {
-      await client.query('BEGIN');
+      await connection.beginTransaction();
       
       // Проверяем существование пользователей и убираем дубликаты
       const uniqueUserIds = [...new Set(data.userIds)];
-      const userCheck = await client.query(
-        'SELECT id FROM users WHERE id = ANY($1)',
+      const [userCheck] = await connection.query(
+        'SELECT id FROM users WHERE id IN (?)',
         [uniqueUserIds]
       );
       
-      if (userCheck.rows.length !== uniqueUserIds.length) {
+      if (!Array.isArray(userCheck) || userCheck.length !== uniqueUserIds.length) {
         throw new Error('Some users not found');
       }
 
-      const boardResult = await client.query(
-        `INSERT INTO boards (title) VALUES ($1) RETURNING *`,
+      const [boardResult] = await connection.query(
+        'INSERT INTO boards (title) VALUES (?)',
         [data.title]
       );
       
-      const board = boardResult.rows[0];
+      const boardId = (boardResult as any).insertId;
       
       // Используем уникальные ID пользователей
       await Promise.all(uniqueUserIds.map(userId =>
-        client.query(
-          `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
-          [board.id, userId]
+        connection.query(
+          'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
+          [boardId, userId]
         )
       ));
 
       // Получаем пользователей доски
-      const usersResult = await client.query(
-        `SELECT u.id, u.name, u.is_admin as "isAdmin", 
-                u.telegram_login as "telegramLogin"
+      const [usersResult] = await connection.query(
+        `SELECT u.id, u.name, u.is_admin as isAdmin, 
+                u.telegram_login as telegramLogin
          FROM users u
          JOIN board_users bu ON u.id = bu.user_id
-         WHERE bu.board_id = $1`,
-        [board.id]
+         WHERE bu.board_id = ?`,
+        [boardId]
       );
       
-      await client.query('COMMIT');
+      await connection.commit();
 
       return {
-        ...board,
-        users: usersResult.rows
+        id: boardId,
+        title: data.title,
+        users: usersResult as User[]
       };
     } catch (e) {
-      await client.query('ROLLBACK');
+      await connection.rollback();
       throw e;
     } finally {
-      client.release();
+      connection.release();
     }
   },
 
   async getBoards(userId: string): Promise<Board[]> {
-    const result = await db.query(
+    const [result] = await db.query(
       `SELECT b.*,
-         (
-           SELECT json_agg(
-             json_build_object(
-               'id', u2.id,
-               'name', u2.name,
-               'isAdmin', u2.is_admin,
-               'telegramLogin', u2.telegram_login
-             )
+         JSON_ARRAYAGG(
+           JSON_OBJECT(
+             'id', u2.id,
+             'name', u2.name,
+             'isAdmin', u2.is_admin,
+             'telegramLogin', u2.telegram_login
            )
-           FROM board_users bu2
-           JOIN users u2 ON bu2.user_id = u2.id
-           WHERE bu2.board_id = b.id
          ) as users
        FROM boards b
        JOIN board_users bu ON b.id = bu.board_id
-       WHERE bu.user_id = $1
+       JOIN users u2 ON bu2.user_id = u2.id
+       WHERE bu.user_id = ?
        GROUP BY b.id`,
       [userId]
     );
     
-    return result.rows;
+    return result as Board[];
   },
 
   async updateBoard(id: string, data: Partial<Board>): Promise<Board> {
-    const client = await db.connect();
+    const connection = await db.getConnection();
     
     try {
-      await client.query('BEGIN');
+      await connection.beginTransaction();
       
-      const boardResult = await client.query(
-        `UPDATE boards SET title = COALESCE($1, title)
-         WHERE id = $2 RETURNING *`,
+      const [boardResult] = await connection.query(
+        'UPDATE boards SET title = COALESCE(?, title) WHERE id = ?',
         [data.title, id]
       );
 
       if (data.users) {
-        await client.query(
-          `DELETE FROM board_users WHERE board_id = $1`,
+        await connection.query(
+          'DELETE FROM board_users WHERE board_id = ?',
           [id]
         );
 
         await Promise.all(data.users.map((user: { id: string }) =>
-          client.query(
-            `INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)`,
+          connection.query(
+            'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
             [id, user.id]
           )
         ));
       }
 
-      await client.query('COMMIT');
-      return boardResult.rows[0];
+      await connection.commit();
+
+      const [updatedBoard] = await connection.query(
+        'SELECT * FROM boards WHERE id = ?',
+        [id]
+      );
+      return (updatedBoard as any)[0];
     } catch (e) {
-      await client.query('ROLLBACK');
+      await connection.rollback();
       throw e;
     } finally {
-      client.release();
+      connection.release();
     }
   },
 
   async deleteBoard(id: string): Promise<void> {
-    await db.query('DELETE FROM boards WHERE id = $1', [id]);
+    await db.query('DELETE FROM boards WHERE id = ?', [id]);
   },
 
   async addUserToBoard(boardId: string, user: { id: string }): Promise<void> {
     await db.query(
-      'INSERT INTO board_users (board_id, user_id) VALUES ($1, $2)',
+      'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
       [boardId, user.id]
     );
   },
 
   async getBoardUsers(boardId: string): Promise<User[]> {
-    const result = await db.query(
-      `SELECT u.id, u.name, u.is_admin as "isAdmin", 
-              u.telegram_login as "telegramLogin"
+    const [result] = await db.query(
+      `SELECT u.id, u.name, u.is_admin as isAdmin, 
+              u.telegram_login as telegramLogin
        FROM users u
        JOIN board_users bu ON u.id = bu.user_id
-       WHERE bu.board_id = $1`,
+       WHERE bu.board_id = ?`,
       [boardId]
     );
-    return result.rows;
+    return result as User[];
   }
 }; 

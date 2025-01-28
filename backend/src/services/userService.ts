@@ -6,25 +6,29 @@ import jwt from 'jsonwebtoken';
 
 export const userService = {
   async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }): Promise<{ user: User; password?: string }> {
-    // Проверка существования telegram_login
-    const existingUser = await db.query('SELECT id FROM users WHERE telegram_login = $1', [userData.telegramLogin]);
-    if (existingUser.rows.length > 0) {
+    const [existingUser] = await db.query('SELECT id FROM users WHERE telegram_login = ?', [userData.telegramLogin]);
+    if (existingUser.length > 0) {
       throw new Error('Telegram login already exists');
     }
 
     const password = userData.password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(password, 12);
     
-    const result = await db.query(
+    const [result] = await db.query(
       `INSERT INTO users (name, password_hash, is_admin, telegram_login)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin", 
-                created_at as "createdAt", updated_at as "updatedAt"`,
+       VALUES (?, ?, ?, ?)`,
       [userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
     );
     
+    const [newUser] = await db.query(
+      `SELECT id, name, is_admin as isAdmin, telegram_login as telegramLogin, 
+              created_at as createdAt, updated_at as updatedAt
+       FROM users WHERE id = ?`,
+      [result.insertId]
+    );
+    
     return {
-      user: result.rows[0],
+      user: newUser[0],
       password: userData.password ? undefined : password
     };
   },
@@ -32,69 +36,72 @@ export const userService = {
   async updateUser(id: string, userData: Partial<User>): Promise<User | null> {
     const updateFields = [];
     const values = [];
-    let valueIndex = 1;
 
     if (userData.name) {
-      updateFields.push(`name = $${valueIndex}`);
+      updateFields.push('name = ?');
       values.push(userData.name);
-      valueIndex++;
     }
     if (userData.isAdmin !== undefined) {
-      updateFields.push(`is_admin = $${valueIndex}`);
+      updateFields.push('is_admin = ?');
       values.push(userData.isAdmin);
-      valueIndex++;
     }
     if (userData.telegramLogin) {
-      updateFields.push(`telegram_login = $${valueIndex}`);
+      updateFields.push('telegram_login = ?');
       values.push(userData.telegramLogin);
-      valueIndex++;
     }
 
     if (updateFields.length === 0) return null;
 
     values.push(id);
-    const result = await db.query(
+    const [result] = await db.query(
       `UPDATE users 
-       SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $${valueIndex}
-       RETURNING id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-                created_at as "createdAt", updated_at as "updatedAt"`,
+       SET ${updateFields.join(', ')}
+       WHERE id = ?`,
       values
     );
 
-    return result.rows[0] || null;
+    if (result.affectedRows === 0) return null;
+
+    const [updatedUser] = await db.query(
+      `SELECT id, name, is_admin as isAdmin, telegram_login as telegramLogin,
+              created_at as createdAt, updated_at as updatedAt
+       FROM users WHERE id = ?`,
+      [id]
+    );
+
+    return updatedUser[0] || null;
   },
 
   async getUserById(id: string): Promise<User | null> {
-    const result = await db.query(
-      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-              created_at as "createdAt", updated_at as "updatedAt"
-       FROM users WHERE id = $1`,
+    const [result] = await db.query(
+      `SELECT id, name, is_admin as isAdmin, telegram_login as telegramLogin,
+              created_at as createdAt, updated_at as updatedAt
+       FROM users WHERE id = ?`,
       [id]
     );
-    return result.rows[0] || null;
+    return result[0] || null;
   },
 
   async getUsers(): Promise<User[]> {
-    const result = await db.query(
-      `SELECT id, name, is_admin as "isAdmin", telegram_login as "telegramLogin",
-              created_at as "createdAt", updated_at as "updatedAt"
+    const [result] = await db.query(
+      `SELECT id, name, is_admin as isAdmin, telegram_login as telegramLogin,
+              created_at as createdAt, updated_at as updatedAt
        FROM users`
     );
-    return result.rows;
+    return result;
   },
 
   async login(telegramLogin: string, password: string): Promise<{ user: User; token: string } | null> {
     try {
-      const result = await db.query(
-        `SELECT id, name, password_hash, is_admin as "isAdmin", 
-                telegram_login as "telegramLogin", created_at as "createdAt", 
-                updated_at as "updatedAt"
-         FROM users WHERE telegram_login = $1`,
+      const [result] = await db.query(
+        `SELECT id, name, password_hash, is_admin as isAdmin, 
+                telegram_login as telegramLogin, created_at as createdAt, 
+                updated_at as updatedAt
+         FROM users WHERE telegram_login = ?`,
         [telegramLogin]
       );
 
-      const user = result.rows[0];
+      const user = result[0];
       if (!user) {
         console.log('User not found:', telegramLogin);
         return null;
@@ -107,7 +114,6 @@ export const userService = {
       }
 
       delete user.password_hash;
-      console.log(user);
       const token = jwt.sign(
         { id: user.id, telegramLogin: user.telegramLogin, isAdmin: user.isAdmin },
         process.env.JWT_SECRET!,
@@ -122,6 +128,6 @@ export const userService = {
   },
 
   async deleteUser(id: string): Promise<void> {
-    await db.query('DELETE FROM users WHERE id = $1', [id]);
+    await db.query('DELETE FROM users WHERE id = ?', [id]);
   }
 }; 

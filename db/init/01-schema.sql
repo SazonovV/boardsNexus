@@ -1,6 +1,6 @@
 -- Создание таблицы пользователей
 CREATE TABLE users (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) DEFAULT (UUID()) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     is_admin BOOLEAN DEFAULT FALSE,
@@ -11,7 +11,7 @@ CREATE TABLE users (
 
 -- Создание таблицы досок
 CREATE TABLE boards (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) DEFAULT (UUID()) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -19,7 +19,7 @@ CREATE TABLE boards (
 
 -- Связующая таблица для пользователей и досок
 CREATE TABLE board_users (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) DEFAULT (UUID()) PRIMARY KEY,
     board_id VARCHAR(36),
     user_id VARCHAR(36),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -32,7 +32,7 @@ CREATE TYPE task_status AS ENUM ('new', 'in-progress', 'on-hold', 'done');
 
 -- Создание таблицы задач
 CREATE TABLE tasks (
-    id VARCHAR(36) PRIMARY KEY,
+    id VARCHAR(36) DEFAULT (UUID()) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     status ENUM('new', 'in-progress', 'on-hold', 'done') DEFAULT 'new',
