@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { taskService } from '../services/taskService';
-import { Task, TaskStatus } from '../types';
+import { Task, TaskStatus } from '../types/index';
 
 const router = express.Router();
 
@@ -24,6 +24,13 @@ router.post('/tasks', async (req: Request<{}, {}, CreatePublicTaskRequest>, res:
         message: 'Required fields: title, boardId, authorTelegramLogin' 
       });
     }
+
+    console.log('Creating public task with data:', {
+      ...taskData,
+      status: taskData.status || TaskStatus.NEW,
+      authorTelegramLogin,
+      assignees: assignees || []
+    });
 
     const task = await taskService.createPublicTask({
       ...taskData,

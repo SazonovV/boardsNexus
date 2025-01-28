@@ -18,7 +18,7 @@ services:
     ports:
       - "8080:80"
     environment:
-      - VITE_API_URL=http://localhost:3001/api
+      - VITE_API_URL=https://nexusboards.ru/api
     depends_on:
       - backend
 volumes:
