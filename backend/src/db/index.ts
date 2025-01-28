@@ -7,6 +7,34 @@ export interface MySQLResultRow extends RowDataPacket {
   [column: string]: any;
 }
 
+export interface UserRow extends MySQLResultRow {
+  id: string;
+  name: string;
+  is_admin: boolean;
+  telegram_login: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface BoardRow extends MySQLResultRow {
+  id: string;
+  title: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface TaskRow extends MySQLResultRow {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  position: number;
+  board_id: string;
+  author_id: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -19,5 +47,5 @@ const pool = mysql.createPool({
   namedPlaceholders: true
 });
 
-export type QueryResult<T = any> = [T[], ResultSetHeader];
+export type QueryResult<T = MySQLResultRow> = [T[], ResultSetHeader];
 export default pool; 

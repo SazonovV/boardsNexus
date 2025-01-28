@@ -25,7 +25,7 @@ export interface User {
     status: TaskStatus;
     position: number;
     boardId: string;
-    author: User;
+    author: User | null;
     assignees: User[];
     createdAt: Date;
     updatedAt: Date;

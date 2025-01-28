@@ -1,10 +1,5 @@
 #!/bin/bash
 
-
-
-
-
-
 # Проверяем наличие .env файла
 if [ ! -f .env ]; then
     echo "Creating .env file from .env.example"
@@ -37,5 +32,3 @@ echo "Application deployed successfully"
 
 echo "Frontend: http://localhost:8080"
 echo "Backend: http://localhost:3001"
-
-250936f5

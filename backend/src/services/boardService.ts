@@ -1,5 +1,23 @@
 import { Board, User } from '../types';
-import db from '../db';
+import db, { BoardRow, UserRow } from '../db';
+import { ResultSetHeader } from 'mysql2';
+
+const mapUserRowToUser = (row: UserRow): User => ({
+  id: row.id,
+  name: row.name,
+  isAdmin: row.is_admin,
+  telegramLogin: row.telegram_login,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at
+});
+
+const mapBoardRowToBoard = (row: BoardRow, users: User[] = []): Board => ({
+  id: row.id,
+  title: row.title,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  users
+});
 
 export const boardService = {
   async createBoard(data: { title: string, userIds: string[] }): Promise<Board> {
@@ -10,7 +28,7 @@ export const boardService = {
       
       // Проверяем существование пользователей и убираем дубликаты
       const uniqueUserIds = [...new Set(data.userIds)];
-      const [userCheck] = await connection.query(
+      const [userCheck] = await connection.query<UserRow[]>(
         'SELECT id FROM users WHERE id IN (?)',
         [uniqueUserIds]
       );
@@ -19,12 +37,12 @@ export const boardService = {
         throw new Error('Some users not found');
       }
 
-      const [boardResult] = await connection.query(
+      const [boardResult] = await connection.query<ResultSetHeader>(
         'INSERT INTO boards (title) VALUES (?)',
         [data.title]
       );
       
-      const boardId = (boardResult as any).insertId;
+      const boardId = String(boardResult.insertId);
       
       // Используем уникальные ID пользователей
       await Promise.all(uniqueUserIds.map(userId =>
@@ -35,22 +53,23 @@ export const boardService = {
       ));
 
       // Получаем пользователей доски
-      const [usersResult] = await connection.query(
-        `SELECT u.id, u.name, u.is_admin as isAdmin, 
-                u.telegram_login as telegramLogin
+      const [usersResult] = await connection.query<UserRow[]>(
+        `SELECT u.id, u.name, u.is_admin, 
+                u.telegram_login, u.created_at, u.updated_at
          FROM users u
          JOIN board_users bu ON u.id = bu.user_id
          WHERE bu.board_id = ?`,
         [boardId]
       );
+
+      const [boardRows] = await connection.query<BoardRow[]>(
+        'SELECT * FROM boards WHERE id = ?',
+        [boardId]
+      );
       
       await connection.commit();
 
-      return {
-        id: boardId,
-        title: data.title,
-        users: usersResult as User[]
-      };
+      return mapBoardRowToBoard(boardRows[0], usersResult.map(mapUserRowToUser));
     } catch (e) {
       await connection.rollback();
       throw e;
@@ -60,25 +79,40 @@ export const boardService = {
   },
 
   async getBoards(userId: string): Promise<Board[]> {
-    const [result] = await db.query(
-      `SELECT b.*,
+    const [result] = await db.query<BoardRow[]>(
+      `SELECT b.*, 
          JSON_ARRAYAGG(
            JSON_OBJECT(
-             'id', u2.id,
-             'name', u2.name,
-             'isAdmin', u2.is_admin,
-             'telegramLogin', u2.telegram_login
+             'id', u.id,
+             'name', u.name,
+             'is_admin', u.is_admin,
+             'telegram_login', u.telegram_login,
+             'created_at', u.created_at,
+             'updated_at', u.updated_at
            )
-         ) as users
+         ) as users_json
        FROM boards b
        JOIN board_users bu ON b.id = bu.board_id
-       JOIN users u2 ON bu2.user_id = u2.id
-       WHERE bu.user_id = ?
+       JOIN users u ON bu.user_id = u.id
+       WHERE EXISTS (
+         SELECT 1 FROM board_users 
+         WHERE board_id = b.id AND user_id = ?
+       )
        GROUP BY b.id`,
       [userId]
     );
     
-    return result as Board[];
+    return result.map(row => {
+      const users = JSON.parse(row.users_json).map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        isAdmin: u.is_admin,
+        telegramLogin: u.telegram_login,
+        createdAt: u.created_at,
+        updatedAt: u.updated_at
+      }));
+      return mapBoardRowToBoard(row, users);
+    });
   },
 
   async updateBoard(id: string, data: Partial<Board>): Promise<Board> {
@@ -87,10 +121,12 @@ export const boardService = {
     try {
       await connection.beginTransaction();
       
-      const [boardResult] = await connection.query(
-        'UPDATE boards SET title = COALESCE(?, title) WHERE id = ?',
-        [data.title, id]
-      );
+      if (data.title) {
+        await connection.query(
+          'UPDATE boards SET title = ? WHERE id = ?',
+          [data.title, id]
+        );
+      }
 
       if (data.users) {
         await connection.query(
@@ -98,7 +134,7 @@ export const boardService = {
           [id]
         );
 
-        await Promise.all(data.users.map((user: { id: string }) =>
+        await Promise.all(data.users.map((user: User) =>
           connection.query(
             'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
             [id, user.id]
@@ -106,13 +142,22 @@ export const boardService = {
         ));
       }
 
-      await connection.commit();
-
-      const [updatedBoard] = await connection.query(
+      const [boardRows] = await connection.query<BoardRow[]>(
         'SELECT * FROM boards WHERE id = ?',
         [id]
       );
-      return (updatedBoard as any)[0];
+
+      const [usersResult] = await connection.query<UserRow[]>(
+        `SELECT u.id, u.name, u.is_admin, 
+                u.telegram_login, u.created_at, u.updated_at
+         FROM users u
+         JOIN board_users bu ON u.id = bu.user_id
+         WHERE bu.board_id = ?`,
+        [id]
+      );
+
+      await connection.commit();
+      return mapBoardRowToBoard(boardRows[0], usersResult.map(mapUserRowToUser));
     } catch (e) {
       await connection.rollback();
       throw e;
@@ -125,7 +170,7 @@ export const boardService = {
     await db.query('DELETE FROM boards WHERE id = ?', [id]);
   },
 
-  async addUserToBoard(boardId: string, user: { id: string }): Promise<void> {
+  async addUserToBoard(boardId: string, user: User): Promise<void> {
     await db.query(
       'INSERT INTO board_users (board_id, user_id) VALUES (?, ?)',
       [boardId, user.id]
@@ -133,14 +178,14 @@ export const boardService = {
   },
 
   async getBoardUsers(boardId: string): Promise<User[]> {
-    const [result] = await db.query(
-      `SELECT u.id, u.name, u.is_admin as isAdmin, 
-              u.telegram_login as telegramLogin
+    const [result] = await db.query<UserRow[]>(
+      `SELECT u.id, u.name, u.is_admin, 
+              u.telegram_login, u.created_at, u.updated_at
        FROM users u
        JOIN board_users bu ON u.id = bu.user_id
        WHERE bu.board_id = ?`,
       [boardId]
     );
-    return result as User[];
+    return result.map(mapUserRowToUser);
   }
 }; 
