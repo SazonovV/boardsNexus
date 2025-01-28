@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { ResultSetHeader } from 'mysql2';
+import { RowDataPacket } from 'mysql2';
 
 const mapUserRowToUser = (row: UserRow): User => ({
   id: row.id,
@@ -28,17 +29,21 @@ export const userService = {
     const password = userData.password || crypto.randomBytes(4).toString('hex');
     const passwordHash = await bcrypt.hash(password, 12);
     
-    const [result] = await db.query<ResultSetHeader>(
-      `INSERT INTO users (name, password_hash, is_admin, telegram_login)
-       VALUES (?, ?, ?, ?)`,
-      [userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
+    const [[{ userId }]] = await db.query<(RowDataPacket & { userId: string })[]>(
+      'SELECT UUID() as userId'
+    );
+
+    await db.query(
+      `INSERT INTO users (id, name, password_hash, is_admin, telegram_login)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, userData.name, passwordHash, userData.isAdmin, userData.telegramLogin]
     );
     
     const [newUsers] = await db.query<UserRow[]>(
       `SELECT id, name, is_admin, telegram_login, 
               created_at, updated_at
        FROM users WHERE id = ?`,
-      [result.insertId]
+      [userId]
     );
     
     return {

@@ -1,6 +1,6 @@
 import { Board, User } from '../types';
 import db, { BoardRow, UserRow } from '../db';
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 const mapUserRowToUser = (row: UserRow): User => ({
   id: row.id,
@@ -28,21 +28,26 @@ export const boardService = {
       
       // Проверяем существование пользователей и убираем дубликаты
       const uniqueUserIds = [...new Set(data.userIds)];
+      const placeholders = uniqueUserIds.map(() => '?').join(',');
       const [userCheck] = await connection.query<UserRow[]>(
-        'SELECT id FROM users WHERE id IN (?)',
-        [uniqueUserIds]
+        `SELECT id FROM users WHERE id IN (${placeholders})`,
+        uniqueUserIds
       );
       
       if (!Array.isArray(userCheck) || userCheck.length !== uniqueUserIds.length) {
         throw new Error('Some users not found');
       }
 
-      const [boardResult] = await connection.query<ResultSetHeader>(
-        'INSERT INTO boards (title) VALUES (?)',
-        [data.title]
+      // Генерируем UUID для новой доски
+      const [[{ boardId }]] = await connection.query<(RowDataPacket & { boardId: string })[]>(
+        'SELECT UUID() as boardId'
       );
-      
-      const boardId = String(boardResult.insertId);
+
+      // Создаем доску с сгенерированным UUID
+      await connection.query<ResultSetHeader>(
+        'INSERT INTO boards (id, title) VALUES (?, ?)',
+        [boardId, data.title]
+      );
       
       // Используем уникальные ID пользователей
       await Promise.all(uniqueUserIds.map(userId =>
@@ -79,31 +84,34 @@ export const boardService = {
   },
 
   async getBoards(userId: string): Promise<Board[]> {
-    const [result] = await db.query<BoardRow[]>(
+    const [result] = await db.query<(BoardRow & { users_json: string | null })[]>(
       `SELECT b.*, 
-         JSON_ARRAYAGG(
-           JSON_OBJECT(
-             'id', u.id,
-             'name', u.name,
-             'is_admin', u.is_admin,
-             'telegram_login', u.telegram_login,
-             'created_at', u.created_at,
-             'updated_at', u.updated_at
-           )
+         COALESCE(
+           JSON_ARRAYAGG(
+             JSON_OBJECT(
+               'id', u.id,
+               'name', u.name,
+               'is_admin', u.is_admin,
+               'telegram_login', u.telegram_login,
+               'created_at', u.created_at,
+               'updated_at', u.updated_at
+             )
+           ),
+           '[]'
          ) as users_json
        FROM boards b
-       JOIN board_users bu ON b.id = bu.board_id
-       JOIN users u ON bu.user_id = u.id
+       LEFT JOIN board_users bu ON b.id = bu.board_id
+       LEFT JOIN users u ON bu.user_id = u.id
        WHERE EXISTS (
          SELECT 1 FROM board_users 
          WHERE board_id = b.id AND user_id = ?
        )
-       GROUP BY b.id`,
+       GROUP BY b.id, b.title, b.created_at, b.updated_at`,
       [userId]
     );
     
     return result.map(row => {
-      const users = JSON.parse(row.users_json).map((u: any) => ({
+      const users = JSON.parse(row.users_json || '[]').map((u: any) => ({
         id: u.id,
         name: u.name,
         isAdmin: u.is_admin,

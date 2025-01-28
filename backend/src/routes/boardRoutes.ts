@@ -30,8 +30,12 @@ router.post('/', authMiddleware, async (req: Request<{}, {}, CreateBoardRequest>
     const board = await boardService.createBoard(req.body);
     res.status(201).json(board);
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error creating board:', error);
+    if (error instanceof Error) {
+      res.status(500).json({ message: error.message });
+    } else {
+      res.status(500).json({ message: 'Server error' });
+    }
   }
 });
 

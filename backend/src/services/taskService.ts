@@ -37,6 +37,15 @@ const mapTaskRowToTask = (row: TaskRow, author: User | null, assignees: User[] =
 
 export const taskService = {
   async createTask(data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { authorTelegramLogin: string }): Promise<Task> {
+    // Validate input data
+    if (!data.title || !data.boardId || !data.authorTelegramLogin) {
+      throw new Error('Missing required fields: title, boardId, or authorTelegramLogin');
+    }
+
+    if (!data.status) {
+      data.status = TaskStatus.NEW;
+    }
+
     const connection = await db.getConnection();
     
     try {
@@ -64,13 +73,17 @@ export const taskService = {
       
       const position = maxPosition[0].max_pos + 1;
       
-      const [taskResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO tasks (title, description, status, position, board_id, author_id)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [data.title, data.description, data.status, position, data.boardId, author.id]
+      // Генерируем UUID для новой задачи
+      const [[{ taskId }]] = await connection.query<(RowDataPacket & { taskId: string })[]>(
+        'SELECT UUID() as taskId'
       );
-      
-      const taskId = taskResult.insertId;
+
+      // Создаем задачу с сгенерированным UUID
+      await connection.query(
+        `INSERT INTO tasks (id, title, description, status, position, board_id, author_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [taskId, data.title, data.description, data.status, position, data.boardId, author.id]
+      );
       
       if (data.assignees?.length) {
         await Promise.all(data.assignees.map(user =>
@@ -94,6 +107,10 @@ export const taskService = {
         [taskId]
       );
 
+      if (!taskDetails[0]) {
+        throw new Error('Failed to create task: Task not found after insertion');
+      }
+
       await connection.commit();
 
       return mapTaskRowToTask(
@@ -115,14 +132,26 @@ export const taskService = {
     try {
       await connection.beginTransaction();
       
-      // Сдвигаем позиции существующих задач
+      // Сначала получаем board_id задачи
+      const [taskResult] = await connection.query<TaskRow[]>(
+        'SELECT board_id FROM tasks WHERE id = ?',
+        [taskId]
+      );
+
+      if (!taskResult[0]) {
+        throw new Error('Task not found');
+      }
+
+      const boardId = taskResult[0].board_id;
+      
+      // Теперь сдвигаем позиции существующих задач
       await connection.query(
         `UPDATE tasks
          SET position = position + 1
-         WHERE board_id = (SELECT board_id FROM tasks WHERE id = ?)
+         WHERE board_id = ?
            AND status = ?
            AND position >= ?`,
-        [taskId, status, position]
+        [boardId, status, position]
       );
       
       // Обновляем статус и позицию задачи
@@ -133,7 +162,7 @@ export const taskService = {
         [status, position, taskId]
       );
 
-      const [taskResult] = await connection.query<TaskRow[]>(
+      const [updatedTaskResult] = await connection.query<TaskRow[]>(
         `SELECT t.*, 
                 u.id as author_id, u.name as author_name, 
                 u.is_admin as author_is_admin, 
@@ -155,17 +184,17 @@ export const taskService = {
       
       await connection.commit();
 
-      const author = taskResult[0].author_id ? {
-        id: taskResult[0].author_id,
-        name: taskResult[0].author_name,
-        isAdmin: taskResult[0].author_is_admin,
-        telegramLogin: taskResult[0].author_telegram_login,
-        createdAt: taskResult[0].author_created_at,
-        updatedAt: taskResult[0].author_updated_at
+      const author = updatedTaskResult[0].author_id ? {
+        id: updatedTaskResult[0].author_id,
+        name: updatedTaskResult[0].author_name,
+        isAdmin: updatedTaskResult[0].author_is_admin,
+        telegramLogin: updatedTaskResult[0].author_telegram_login,
+        createdAt: updatedTaskResult[0].author_created_at,
+        updatedAt: updatedTaskResult[0].author_updated_at
       } : null;
       
       return mapTaskRowToTask(
-        taskResult[0],
+        updatedTaskResult[0],
         author,
         assigneesResult.map(mapUserRowToUser)
       );
@@ -185,22 +214,26 @@ export const taskService = {
               u.telegram_login as author_telegram_login,
               u.created_at as author_created_at,
               u.updated_at as author_updated_at,
-              JSON_ARRAYAGG(
-                JSON_OBJECT(
-                  'id', u2.id,
-                  'name', u2.name,
-                  'is_admin', u2.is_admin,
-                  'telegram_login', u2.telegram_login,
-                  'created_at', u2.created_at,
-                  'updated_at', u2.updated_at
-                )
+              COALESCE(
+                JSON_ARRAYAGG(
+                  JSON_OBJECT(
+                    'id', u2.id,
+                    'name', u2.name,
+                    'is_admin', u2.is_admin,
+                    'telegram_login', u2.telegram_login,
+                    'created_at', u2.created_at,
+                    'updated_at', u2.updated_at
+                  )
+                ),
+                '[]'
               ) as assignees_json
        FROM tasks t
        LEFT JOIN users u ON t.author_id = u.id
        LEFT JOIN task_assignees ta ON t.id = ta.task_id
        LEFT JOIN users u2 ON ta.user_id = u2.id
        WHERE t.board_id = ?
-       GROUP BY t.id
+       GROUP BY t.id, t.title, t.description, t.status, t.position, t.board_id, t.created_at, t.updated_at,
+                u.id, u.name, u.is_admin, u.telegram_login, u.created_at, u.updated_at
        ORDER BY t.position`,
       [boardId]
     );
@@ -317,40 +350,46 @@ export const taskService = {
       `SELECT 
         u.id, u.name, u.is_admin, u.telegram_login,
         u.created_at, u.updated_at,
-        JSON_ARRAYAGG(
-          JSON_OBJECT(
-            'id', t.id,
-            'title', t.title,
-            'description', t.description,
-            'status', t.status,
-            'position', t.position,
-            'board_id', t.board_id,
-            'created_at', t.created_at,
-            'updated_at', t.updated_at,
-            'author', JSON_OBJECT(
-              'id', au.id,
-              'name', au.name,
-              'is_admin', au.is_admin,
-              'telegram_login', au.telegram_login,
-              'created_at', au.created_at,
-              'updated_at', au.updated_at
-            ),
-            'assignees', (
-              SELECT JSON_ARRAYAGG(
-                JSON_OBJECT(
-                  'id', u2.id,
-                  'name', u2.name,
-                  'is_admin', u2.is_admin,
-                  'telegram_login', u2.telegram_login,
-                  'created_at', u2.created_at,
-                  'updated_at', u2.updated_at
-                )
+        COALESCE(
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', t.id,
+              'title', t.title,
+              'description', t.description,
+              'status', t.status,
+              'position', t.position,
+              'board_id', t.board_id,
+              'created_at', t.created_at,
+              'updated_at', t.updated_at,
+              'author', JSON_OBJECT(
+                'id', au.id,
+                'name', au.name,
+                'is_admin', au.is_admin,
+                'telegram_login', au.telegram_login,
+                'created_at', au.created_at,
+                'updated_at', au.updated_at
+              ),
+              'assignees', COALESCE(
+                (
+                  SELECT JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                      'id', u2.id,
+                      'name', u2.name,
+                      'is_admin', u2.is_admin,
+                      'telegram_login', u2.telegram_login,
+                      'created_at', u2.created_at,
+                      'updated_at', u2.updated_at
+                    )
+                  )
+                  FROM task_assignees ta2
+                  JOIN users u2 ON ta2.user_id = u2.id
+                  WHERE ta2.task_id = t.id
+                ),
+                '[]'
               )
-              FROM task_assignees ta2
-              JOIN users u2 ON ta2.user_id = u2.id
-              WHERE ta2.task_id = t.id
             )
-          )
+          ),
+          '[]'
         ) as tasks_json
       FROM users u
       JOIN board_users bu ON u.id = bu.user_id
@@ -358,7 +397,7 @@ export const taskService = {
       LEFT JOIN tasks t ON ta.task_id = t.id AND t.board_id = ?
       LEFT JOIN users au ON t.author_id = au.id
       WHERE bu.board_id = ?
-      GROUP BY u.id
+      GROUP BY u.id, u.name, u.is_admin, u.telegram_login, u.created_at, u.updated_at
       HAVING COUNT(t.id) > 0`,
       [boardId, boardId]
     );
@@ -369,7 +408,14 @@ export const taskService = {
       const key = user.telegramLogin || user.id;
       if (row.tasks_json) {
         const tasks = JSON.parse(row.tasks_json).map((t: any) => ({
-          ...t,
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          position: t.position,
+          boardId: t.board_id,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
           author: t.author ? {
             id: t.author.id,
             name: t.author.name,
@@ -378,14 +424,14 @@ export const taskService = {
             createdAt: t.author.created_at,
             updatedAt: t.author.updated_at
           } : null,
-          assignees: (t.assignees || []).map((a: any) => ({
+          assignees: Array.isArray(t.assignees) ? t.assignees.map((a: any) => ({
             id: a.id,
             name: a.name,
             isAdmin: a.is_admin,
             telegramLogin: a.telegram_login,
             createdAt: a.created_at,
             updatedAt: a.updated_at
-          }))
+          })) : []
         }));
         tasksByUser[key] = tasks;
       }
@@ -422,14 +468,17 @@ export const taskService = {
       
       const position = maxPosition[0].max_pos + 1;
       
-      // Создаем задачу
-      const [taskResult] = await connection.query<ResultSetHeader>(
-        `INSERT INTO tasks (title, description, status, position, board_id, author_id)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [data.title, data.description, data.status, position, data.boardId, author.id]
+      // Генерируем UUID для новой задачи
+      const [[{ taskId }]] = await connection.query<(RowDataPacket & { taskId: string })[]>(
+        'SELECT UUID() as taskId'
       );
       
-      const taskId = taskResult.insertId;
+      // Создаем задачу с сгенерированным UUID
+      await connection.query(
+        `INSERT INTO tasks (id, title, description, status, position, board_id, author_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [taskId, data.title, data.description, data.status, position, data.boardId, author.id]
+      );
 
       // Добавляем исполнителей, если они указаны
       const assignees: User[] = [];
@@ -455,6 +504,10 @@ export const taskService = {
         [taskId]
       );
 
+      if (!taskDetails[0]) {
+        throw new Error('Failed to create task: Task not found after insertion');
+      }
+
       await connection.commit();
       return mapTaskRowToTask(taskDetails[0], author, assignees);
     } catch (e) {
@@ -469,12 +522,15 @@ export const taskService = {
     const [result] = await db.query<(UserRow & { tasks_json: string })[]>(
       `SELECT 
         u.telegram_login,
-        JSON_ARRAYAGG(
-          JSON_OBJECT(
-            'title', t.title,
-            'description', t.description,
-            'status', t.status
-          )
+        COALESCE(
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'title', t.title,
+              'description', t.description,
+              'status', t.status
+            )
+          ),
+          '[]'
         ) as tasks_json
       FROM users u
       JOIN board_users bu ON u.id = bu.user_id
