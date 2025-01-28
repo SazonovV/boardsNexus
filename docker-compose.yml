@@ -14,8 +14,6 @@ services:
       - ./db/config:/etc/postgresql
     ports:
       - "5433:5432"
-    networks:
-      - traefik
     command: postgres -c 'config_file=/etc/postgresql/postgresql.conf'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d ${DB_NAME}"]
@@ -36,8 +34,6 @@ services:
       PORT: 3001
     ports:
       - "3001:3001"
-    networks:
-      - traefik
     depends_on:
       postgres:
         condition: service_healthy
