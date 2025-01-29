@@ -477,7 +477,7 @@ export const taskService = {
       await connection.query(
         `INSERT INTO tasks (id, title, description, status, position, board_id, author_id)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [taskId, data.title, data.description, data.status, position, data.boardId, author.id]
+        [taskId, data.title, author.name, data.status, position, data.boardId, author.id]
       );
 
       // Добавляем исполнителей, если они указаны
