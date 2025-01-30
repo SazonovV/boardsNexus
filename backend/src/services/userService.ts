@@ -136,7 +136,7 @@ export const userService = {
       const token = jwt.sign(
         { id: mappedUser.id, telegramLogin: mappedUser.telegramLogin, isAdmin: mappedUser.isAdmin },
         process.env.JWT_SECRET!,
-        { expiresIn: '24h' }
+        { expiresIn: '336h' }
       );
 
       return { user: mappedUser, token };
