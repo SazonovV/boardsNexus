@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import BoardsList from './components/BoardsList';
@@ -9,20 +9,35 @@ import UsersManagement from './components/UsersManagement';
 
 const App: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
 
-  if (!user) {
-    return <Login />;
-  }
+  // Don't show header on login page
+  const showHeader = location.pathname !== '/login';
 
   return (
     <div className="app">
-      <Header />
+      {showHeader && user && <Header />}
       <Routes>
-        <Route path="/" element={<BoardsList />} />
-        <Route path="/board/:id" element={<Board />} />
-        <Route 
-          path="/users" 
-          element={user.isAdmin ? <UsersManagement /> : <Navigate to="/" replace />} 
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+        <Route
+          path="/"
+          element={user ? <BoardsList /> : <Navigate to="/login" state={{ from: location.pathname }} />}
+        />
+        <Route
+          path="/board/:id"
+          element={user ? <Board /> : <Navigate to="/login" state={{ from: location.pathname }} />}
+        />
+        <Route
+          path="/users"
+          element={
+            user?.isAdmin ? (
+              <UsersManagement />
+            ) : user ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Navigate to="/login" state={{ from: location.pathname }} />
+            )
+          }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

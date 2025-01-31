@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User } from '../types';
-import { apiService } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { apiService, authErrorEvent } from '../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +19,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
   useEffect(() => {
     if (user) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
@@ -27,13 +30,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    // Handle auth errors
+    const handleAuthError = () => {
+      logout();
+      // Save the current location to redirect back after login
+      if (location.pathname !== '/login') {
+        navigate('/login', { state: { from: location.pathname } });
+      }
+    };
+
+    authErrorEvent.addEventListener('authError', handleAuthError);
+    return () => {
+      authErrorEvent.removeEventListener('authError', handleAuthError);
+    };
+  }, [navigate, location]);
 
   const login = async (telegramLogin: string, password: string) => {
     try {
       const data = await apiService.login(telegramLogin, password);
       setUser(data.user);
-      navigate('/');
+      // Check if there's a redirect location
+      const state = location.state as { from?: string };
+      navigate(state?.from || '/');
     } catch (error) {
       throw new Error('Login failed');
     }
@@ -42,7 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     apiService.logout();
     setUser(null);
-  }, []);
+    navigate('/login');
+  }, [navigate]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout }}>

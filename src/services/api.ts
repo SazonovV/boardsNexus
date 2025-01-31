@@ -7,7 +7,10 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Исправленный интерцептор
+// Event for handling auth errors
+export const authErrorEvent = new EventTarget();
+
+// Request interceptor
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -15,6 +18,18 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   }
   return config;
 });
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Dispatch auth error event
+      authErrorEvent.dispatchEvent(new Event('authError'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 interface CreateUserResponse {
   user: User;
