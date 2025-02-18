@@ -74,12 +74,20 @@ body {
   align-items: center;
   margin-bottom: 24px;
   padding: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .board-header h2 {
   color: white;
   font-size: 20px;
   font-weight: 700;
+}
+
+.board-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .board-actions button {
@@ -91,6 +99,7 @@ body {
   cursor: pointer;
   font-weight: 500;
   transition: background 0.2s ease;
+  white-space: nowrap;
 }
 
 .board-actions button:hover {
@@ -98,20 +107,37 @@ body {
 }
 
 .columns {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(272px, auto);
   gap: 8px;
   align-items: flex-start;
   height: calc(100vh - 120px);
+  overflow-x: auto;
+  padding-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .columns {
+    grid-auto-columns: 85vw;
+  }
+  
+  .board {
+    padding: 12px;
+  }
+  
+  .board-header {
+    padding: 4px;
+  }
 }
 
 .column {
   background: #ebecf0;
   border-radius: 3px;
-  width: 272px;
-  min-width: 272px;
-  padding: 8px;
   height: fit-content;
   max-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .column h3 {
