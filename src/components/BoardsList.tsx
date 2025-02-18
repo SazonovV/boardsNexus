@@ -33,7 +33,7 @@ const BoardsList: React.FC = () => {
   return (
     <div className="boards-list">
       <h1>My Boards</h1>
-      {user?.isAdmin && (
+      {!!user?.isAdmin && (
         <button onClick={handleCreateBoard}>Create New Board</button>
       )}
       <div className="boards-grid">

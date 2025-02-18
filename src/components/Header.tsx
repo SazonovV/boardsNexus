@@ -25,7 +25,7 @@ const Header: React.FC = () => {
           )}
         </div>
         <div className="header-right">
-          {user.isAdmin && (
+          {!!user.isAdmin && (
             <Link to="/users" className="nav-link">
               Manage Users
             </Link>

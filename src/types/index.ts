@@ -13,6 +13,7 @@ export type Task = {
   createdAt: string;
   status: TaskStatus;
   boardId: string;
+  author: User;
 };
 
 export enum TaskStatus {

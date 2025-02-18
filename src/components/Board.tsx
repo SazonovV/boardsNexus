@@ -161,8 +161,11 @@ const Board: React.FC = () => {
                               </div>
                             </div>
                             <p>{task.description}</p>
-                            <div className="task-meta">
+                            {task.assignees.length > 0 && <div className="task-meta">
                               <span>Assignees: {task.assignees.map(u => u.name).join(', ')}</span>
+                            </div>}
+                            <div className="task-meta">
+                              <span>Author: {task.author.name}</span>
                               <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                             </div>
                           </div>

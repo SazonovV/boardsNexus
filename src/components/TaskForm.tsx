@@ -68,7 +68,6 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
             />
           </div>
           <div className="form-group">

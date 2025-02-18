@@ -36,7 +36,7 @@ router.post('/tasks', async (req: Request<{}, {}, CreatePublicTaskRequest>, res:
       ...taskData,
       status: taskData.status || TaskStatus.NEW,
       authorTelegramLogin,
-      assignees: assignees || []
+      assignees: assignees || [{ telegramLogin: authorTelegramLogin }]
     });
 
     res.status(201).json(task);
