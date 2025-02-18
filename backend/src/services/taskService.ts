@@ -215,22 +215,25 @@ export const taskService = {
               u.created_at as author_created_at,
               u.updated_at as author_updated_at,
               COALESCE(
-                JSON_ARRAYAGG(
-                  JSON_OBJECT(
-                    'id', u2.id,
-                    'name', u2.name,
-                    'is_admin', u2.is_admin,
-                    'telegram_login', u2.telegram_login,
-                    'created_at', u2.created_at,
-                    'updated_at', u2.updated_at
+                (
+                  SELECT JSON_ARRAYAGG(
+                    JSON_OBJECT(
+                      'id', u2.id,
+                      'name', u2.name,
+                      'is_admin', u2.is_admin,
+                      'telegram_login', u2.telegram_login,
+                      'created_at', u2.created_at,
+                      'updated_at', u2.updated_at
+                    )
                   )
+                  FROM task_assignees ta2
+                  JOIN users u2 ON ta2.user_id = u2.id
+                  WHERE ta2.task_id = t.id
                 ),
                 '[]'
               ) as assignees_json
        FROM tasks t
        LEFT JOIN users u ON t.author_id = u.id
-       LEFT JOIN task_assignees ta ON t.id = ta.task_id
-       LEFT JOIN users u2 ON ta.user_id = u2.id
        WHERE t.board_id = ?
        GROUP BY t.id, t.title, t.description, t.status, t.position, t.board_id, t.created_at, t.updated_at,
                 u.id, u.name, u.is_admin, u.telegram_login, u.created_at, u.updated_at
@@ -247,6 +250,7 @@ export const taskService = {
         createdAt: task.author_created_at,
         updatedAt: task.author_updated_at
       } : null;
+      console.log(task, author);
 
       const assignees = JSON.parse(task.assignees_json || '[]').map((u: any) => ({
         id: u.id,
@@ -256,6 +260,7 @@ export const taskService = {
         createdAt: u.created_at,
         updatedAt: u.updated_at
       }));
+
 
       return mapTaskRowToTask(task, author, assignees);
     });
