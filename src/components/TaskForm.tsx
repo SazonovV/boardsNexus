@@ -49,6 +49,17 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
     onClose();
   };
 
+  const selectRandomAssignee = () => {
+    if (users.length > 0) {
+      const randomUser = users[Math.floor(Math.random() * users.length)];
+      setSelectedUsers([randomUser.id]);
+    }
+  };
+
+  const selectLeads = () => {
+      setSelectedUsers(["4864b34d-ddb5-11ef-bd40-52540023d762", "5574e392-de1e-11ef-bd40-52540023d762", "8525e54b-de46-11ef-bd40-52540023d762", "a01a05f2-de46-11ef-bd40-52540023d762", "e723d226-de46-11ef-bd40-52540023d762", "f07a5440-dfcf-11ef-bd40-52540023d762", "f82d08d9-de34-11ef-bd40-52540023d762", "fc61e8b4-de1d-11ef-bd40-52540023d762"]);
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content">
@@ -71,7 +82,25 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
             />
           </div>
           <div className="form-group">
-            <label>Assignees:</label>
+            <div className="assignees-header">
+              <label>Assignees:</label>
+              <div className='assignees-buttons'>
+                <button 
+                  type="button" 
+                  onClick={selectRandomAssignee}
+                  className="find-random-button"
+                >
+                  Найти крайнего
+                </button>
+                <button 
+                  type="button" 
+                  onClick={selectLeads}
+                  className="find-random-button"
+                >
+                  Выбрать лидов
+                </button>
+              </div>
+            </div>
             <div className="assignees-list">
               {users.map(user => (
                 <label key={user.id} className="checkbox-label">
@@ -92,7 +121,7 @@ const TaskForm: React.FC<TaskFormProps> = ({ boardId, task, onSubmit, onClose })
             </div>
           </div>
           <div className="modal-actions">
-            <button type="submit">{task ? 'Update' : 'Create'}</button>
+            <button type="submit">Сохранить</button>
             <button type="button" onClick={onClose}>Cancel</button>
           </div>
         </form>
