@@ -350,7 +350,7 @@ export const taskService = {
     }
   },
 
-  async getBoardTasksByUser(boardId: string): Promise<{ [userKey: string]: Task[] }> {
+  async getBoardTasksByUser(boardId: string, excludeDone: boolean = false): Promise<{ [userKey: string]: Task[] }> {
     const [result] = await db.query<(UserRow & { tasks_json: string })[]>(
       `SELECT 
         u.id, u.name, u.is_admin, u.telegram_login,
@@ -398,7 +398,7 @@ export const taskService = {
             FROM tasks t
             JOIN task_assignees ta ON t.id = ta.task_id AND ta.user_id = u.id
             LEFT JOIN users au ON t.author_id = au.id
-            WHERE t.board_id = ?
+            WHERE t.board_id = ? ${excludeDone ? "AND t.status != 'done'" : ''}
           ),
           '[]'
         ) as tasks_json
@@ -534,29 +534,34 @@ export const taskService = {
       `SELECT 
         u.telegram_login,
         COALESCE(
-          JSON_ARRAYAGG(
-            JSON_OBJECT(
-              'title', t.title,
-              'description', t.description,
-              'status', t.status
+          (
+            SELECT JSON_ARRAYAGG(
+              JSON_OBJECT(
+                'title', t.title,
+                'description', t.description,
+                'status', t.status
+              )
             )
+            FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id AND ta.user_id = u.id
+            WHERE t.board_id = ? AND t.status != 'done'
           ),
           '[]'
         ) as tasks_json
       FROM users u
       JOIN board_users bu ON u.id = bu.user_id
-      LEFT JOIN task_assignees ta ON u.id = ta.user_id
-      LEFT JOIN tasks t ON ta.task_id = t.id AND t.board_id = ?
       WHERE bu.board_id = ?
-      GROUP BY u.telegram_login
-      HAVING COUNT(t.id) > 0`,
+      GROUP BY u.telegram_login`,
       [boardId, boardId]
     );
 
     const tasksByUser: { [key: string]: TaskSummary[] } = {};
     result.forEach(row => {
-      if (row.tasks_json) {
-        tasksByUser[row.telegram_login] = JSON.parse(row.tasks_json);
+      if (row.telegram_login && row.tasks_json) {
+        const tasks = JSON.parse(row.tasks_json);
+        if (tasks.length > 0) {
+          tasksByUser[row.telegram_login] = tasks;
+        }
       }
     });
 

@@ -76,7 +76,8 @@ router.patch('/:id', async (req: Request<{ id: string }, {}, Partial<Task>>, res
 
 router.get('/board/:boardId/by-user', async (req: Request<{ boardId: string }>, res: Response) => {
   try {
-    const tasks = await taskService.getBoardTasksByUser(req.params.boardId);
+    const excludeDone = req.query.excludeDone === 'true';
+    const tasks = await taskService.getBoardTasksByUser(req.params.boardId, excludeDone);
     res.json(tasks);
   } catch (error) {
     console.log(error);
