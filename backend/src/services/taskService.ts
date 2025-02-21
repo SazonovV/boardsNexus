@@ -356,54 +356,56 @@ export const taskService = {
         u.id, u.name, u.is_admin, u.telegram_login,
         u.created_at, u.updated_at,
         COALESCE(
-          JSON_ARRAYAGG(
-            JSON_OBJECT(
-              'id', t.id,
-              'title', t.title,
-              'description', t.description,
-              'status', t.status,
-              'position', t.position,
-              'board_id', t.board_id,
-              'created_at', t.created_at,
-              'updated_at', t.updated_at,
-              'author', JSON_OBJECT(
-                'id', au.id,
-                'name', au.name,
-                'is_admin', au.is_admin,
-                'telegram_login', au.telegram_login,
-                'created_at', au.created_at,
-                'updated_at', au.updated_at
-              ),
-              'assignees', COALESCE(
-                (
-                  SELECT JSON_ARRAYAGG(
-                    JSON_OBJECT(
-                      'id', u2.id,
-                      'name', u2.name,
-                      'is_admin', u2.is_admin,
-                      'telegram_login', u2.telegram_login,
-                      'created_at', u2.created_at,
-                      'updated_at', u2.updated_at
-                    )
-                  )
-                  FROM task_assignees ta2
-                  JOIN users u2 ON ta2.user_id = u2.id
-                  WHERE ta2.task_id = t.id
+          (
+            SELECT JSON_ARRAYAGG(
+              JSON_OBJECT(
+                'id', t.id,
+                'title', t.title,
+                'description', t.description,
+                'status', t.status,
+                'position', t.position,
+                'board_id', t.board_id,
+                'created_at', t.created_at,
+                'updated_at', t.updated_at,
+                'author', JSON_OBJECT(
+                  'id', au.id,
+                  'name', au.name,
+                  'is_admin', au.is_admin,
+                  'telegram_login', au.telegram_login,
+                  'created_at', au.created_at,
+                  'updated_at', au.updated_at
                 ),
-                '[]'
+                'assignees', COALESCE(
+                  (
+                    SELECT JSON_ARRAYAGG(
+                      JSON_OBJECT(
+                        'id', u2.id,
+                        'name', u2.name,
+                        'is_admin', u2.is_admin,
+                        'telegram_login', u2.telegram_login,
+                        'created_at', u2.created_at,
+                        'updated_at', u2.updated_at
+                      )
+                    )
+                    FROM task_assignees ta2
+                    JOIN users u2 ON ta2.user_id = u2.id
+                    WHERE ta2.task_id = t.id
+                  ),
+                  '[]'
+                )
               )
             )
+            FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id AND ta.user_id = u.id
+            LEFT JOIN users au ON t.author_id = au.id
+            WHERE t.board_id = ?
           ),
           '[]'
         ) as tasks_json
       FROM users u
       JOIN board_users bu ON u.id = bu.user_id
-      LEFT JOIN task_assignees ta ON u.id = ta.user_id
-      LEFT JOIN tasks t ON ta.task_id = t.id AND t.board_id = ?
-      LEFT JOIN users au ON t.author_id = au.id
       WHERE bu.board_id = ?
-      GROUP BY u.id, u.name, u.is_admin, u.telegram_login, u.created_at, u.updated_at
-      HAVING COUNT(t.id) > 0`,
+      GROUP BY u.id, u.name, u.is_admin, u.telegram_login, u.created_at, u.updated_at`,
       [boardId, boardId]
     );
 
@@ -412,33 +414,37 @@ export const taskService = {
       const user = mapUserRowToUser(row);
       const key = user.telegramLogin || user.id;
       if (row.tasks_json) {
-        const tasks = JSON.parse(row.tasks_json).map((t: any) => ({
-          id: t.id,
-          title: t.title,
-          description: t.description,
-          status: t.status,
-          position: t.position,
-          boardId: t.board_id,
-          createdAt: t.created_at,
-          updatedAt: t.updated_at,
-          author: t.author ? {
-            id: t.author.id,
-            name: t.author.name,
-            isAdmin: t.author.is_admin,
-            telegramLogin: t.author.telegram_login,
-            createdAt: t.author.created_at,
-            updatedAt: t.author.updated_at
-          } : null,
-          assignees: Array.isArray(t.assignees) ? t.assignees.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            isAdmin: a.is_admin,
-            telegramLogin: a.telegram_login,
-            createdAt: a.created_at,
-            updatedAt: a.updated_at
-          })) : []
-        }));
-        tasksByUser[key] = tasks;
+        const tasks = JSON.parse(row.tasks_json)
+          .map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            status: t.status,
+            position: t.position,
+            boardId: t.board_id,
+            createdAt: t.created_at,
+            updatedAt: t.updated_at,
+            author: t.author ? {
+              id: t.author.id,
+              name: t.author.name,
+              isAdmin: t.author.is_admin,
+              telegramLogin: t.author.telegram_login,
+              createdAt: t.author.created_at,
+              updatedAt: t.author.updated_at
+            } : null,
+            assignees: Array.isArray(t.assignees) ? t.assignees.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              isAdmin: a.is_admin,
+              telegramLogin: a.telegram_login,
+              createdAt: a.created_at,
+              updatedAt: a.updated_at
+            })) : []
+          }));
+        
+        if (tasks.length > 0) {
+          tasksByUser[key] = tasks;
+        }
       }
     });
 
