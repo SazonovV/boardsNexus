@@ -194,6 +194,6 @@ export const boardService = {
        WHERE bu.board_id = ?`,
       [boardId]
     );
-    return result.map(mapUserRowToUser);
+    return result.map(mapUserRowToUser).sort((a, b) => a.name.localeCompare(b.name));
   }
 }; 
